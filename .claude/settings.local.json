@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install)",
+      "Bash(npm install:*)",
+      "Bash(npm run dev:*)",
+      "Bash(psql:*)",
+      "Bash(where:*)",
+      "Bash(PGPASSWORD=postgres psql:*)",
+      "Bash(npx kill-port:*)",
+      "Bash(taskkill:*)",
+      "Bash(pkill:*)",
+      "Bash(curl:*)",
+      "Bash(cat:*)",
+      "Bash(node:*)",
+      "Bash(cmd //c \"rd /s /q C:\\Fulvo\\backend\")",
+      "Bash(cmd //c \"rd /s /q C:\\Fulvo\\frontend\")",
+      "Bash(powershell -Command \"Remove-Item -Path ''C:\\Fulvo\\backend'' -Recurse -Force; Remove-Item -Path ''C:\\Fulvo\\frontend'' -Recurse -Force\")",
+      "Bash(powershell -Command \"Get-Process | Where-Object {$_Path -like ''*Fulvo*''} | Select-Object Id, ProcessName, Path\")"
+    ]
+  }
+}
