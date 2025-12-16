@@ -1,48 +1,96 @@
-import { Link } from 'react-router-dom'
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { login } from '../services/auth';
 
 function Login() {
+  const navigate = useNavigate();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const response = await login(email, password);
+
+      // Redirigir según el tipo de usuario
+      if (response.user.tipo === 'dueno') {
+        navigate('/owner');
+      } else {
+        navigate('/player');
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || 'Error al iniciar sesión');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white">
-      <div className="w-full max-w-md p-8">
+    <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
+      <div className="max-w-md w-full bg-gray-800 rounded-lg p-8">
+        {/* Logo */}
         <div className="text-center mb-8">
-          <h1 className="text-5xl font-bold text-[#75AADB]">Fulvo</h1>
-          <p className="text-black mt-2">Fútbol 7 en Argentina</p>
+          <h1 className="text-4xl font-bold text-sky-400">Fulvo</h1>
+          <p className="text-gray-400 mt-2">Fútbol 7 en Argentina</p>
         </div>
 
-        <form className="bg-white rounded-2xl shadow-lg p-8 space-y-6">
+        {/* Error message */}
+        {error && (
+          <div className="bg-red-500/20 border border-red-500 text-red-400 px-4 py-3 rounded mb-4">
+            {error}
+          </div>
+        )}
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div>
+            <label className="block text-gray-300 mb-2">Email</label>
             <input
-              type="text"
-              placeholder="Email o teléfono"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#75AADB] focus:border-transparent"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-gray-700 text-white rounded px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-400"
+              placeholder="tu@email.com"
+              required
             />
           </div>
 
           <div>
+            <label className="block text-gray-300 mb-2">Contraseña</label>
             <input
               type="password"
-              placeholder="Contraseña"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#75AADB] focus:border-transparent"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full bg-gray-700 text-white rounded px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-400"
+              placeholder="••••••••"
+              required
             />
           </div>
 
           <button
             type="submit"
-            className="w-full bg-[#75AADB] text-white font-semibold py-3 rounded-lg hover:bg-[#5a9ad4] transition-colors"
+            disabled={loading}
+            className="w-full bg-sky-500 hover:bg-sky-600 disabled:bg-sky-800 disabled:cursor-not-allowed text-white font-semibold py-3 rounded transition"
           >
-            Iniciar Sesión
+            {loading ? 'Ingresando...' : 'Ingresar'}
           </button>
         </form>
 
-        <p className="text-center mt-6 text-gray-600">
+        {/* Register link */}
+        <p className="text-center text-gray-400 mt-6">
           ¿No tenés cuenta?{' '}
-          <Link to="/register" className="text-[#75AADB] font-semibold hover:underline">
+          <Link to="/register" className="text-sky-400 hover:underline">
             Registrate
           </Link>
         </p>
       </div>
     </div>
-  )
+  );
 }
 
-export default Login
+export default Login;

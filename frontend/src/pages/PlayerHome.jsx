@@ -1,78 +1,103 @@
-import { Link } from 'react-router-dom'
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { getMatches } from '../services/matches';
 
 function PlayerHome() {
-  const partidos = [
-    {
-      id: 1,
-      cancha: 'Cancha Los Amigos',
-      fecha: 'Sábado 21 Dic - 18:00',
-      ubicacion: 'Palermo, CABA',
-      precio: 5000,
-      jugadoresActuales: 4,
-      jugadoresTotales: 14
-    },
-    {
-      id: 2,
-      cancha: 'Complejo El Gol',
-      fecha: 'Domingo 22 Dic - 10:00',
-      ubicacion: 'Núñez, CABA',
-      precio: 4500,
-      jugadoresActuales: 10,
-      jugadoresTotales: 14
-    },
-    {
-      id: 3,
-      cancha: 'Fútbol 7 San Martín',
-      fecha: 'Domingo 22 Dic - 16:00',
-      ubicacion: 'San Martín, GBA',
-      precio: 4000,
-      jugadoresActuales: 7,
-      jugadoresTotales: 14
-    }
-  ]
+  const [matches, setMatches] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const fetchMatches = async () => {
+      try {
+        const data = await getMatches();
+        setMatches(data);
+      } catch (err) {
+        setError(err.response?.data?.error || 'Error al cargar partidos');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMatches();
+  }, []);
+
+  // Formatear fecha para mostrar
+  const formatDate = (fecha) => {
+    if (!fecha) return '';
+    const date = new Date(fecha);
+    const options = { weekday: 'long', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' };
+    return date.toLocaleDateString('es-AR', options);
+  };
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <header className="bg-white shadow-sm px-6 py-4 flex justify-between items-center">
-        <Link to="/player" className="text-2xl font-bold text-[#75AADB]">Fulvo</Link>
+    <div className="min-h-screen bg-gray-900">
+      <header className="bg-gray-800 shadow-sm px-6 py-4 flex justify-between items-center">
+        <Link to="/player" className="text-2xl font-bold text-sky-400">Fulvo</Link>
         <Link to="/player/profile" className="text-2xl">👤</Link>
       </header>
 
       <main className="p-6 max-w-2xl mx-auto">
-        <h1 className="text-2xl font-bold text-gray-800 mb-6">Partidos Disponibles</h1>
+        <h1 className="text-2xl font-bold text-white mb-6">Partidos Disponibles</h1>
 
-        <div className="space-y-4">
-          {partidos.map((partido) => (
-            <div key={partido.id} className="bg-white rounded-xl shadow-md p-5">
-              <div className="flex justify-between items-start mb-3">
-                <h2 className="text-lg font-semibold text-gray-800">{partido.cancha}</h2>
-                <span className="text-lg font-bold text-[#75AADB]">${partido.precio}</span>
-              </div>
-              
-              <div className="space-y-2 text-gray-600 mb-4">
-                <p className="flex items-center gap-2">
-                  <span>📅</span> {partido.fecha}
-                </p>
-                <p className="flex items-center gap-2">
-                  <span>📍</span> {partido.ubicacion}
-                </p>
-                <p className="flex items-center gap-2">
-                  <span>👥</span> {partido.jugadoresActuales}/{partido.jugadoresTotales} jugadores
-                </p>
-              </div>
+        {/* Loading state */}
+        {loading && (
+          <div className="text-center text-gray-400 py-10">
+            Cargando partidos...
+          </div>
+        )}
 
-              <Link
-                to={`/player/match/${partido.id}`}
-                className="block w-full text-center bg-[#75AADB] text-white font-semibold py-2 rounded-lg hover:bg-[#5a9ad4] transition-colors"
-              >
-                Ver Partido
-              </Link>
-            </div>
-          ))}
-        </div>
+        {/* Error state */}
+        {error && (
+          <div className="bg-red-500/20 border border-red-500 text-red-400 px-4 py-3 rounded mb-4">
+            {error}
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!loading && !error && matches.length === 0 && (
+          <div className="text-center text-gray-400 py-10">
+            No hay partidos disponibles
+          </div>
+        )}
+
+        {/* Matches list */}
+        {!loading && !error && matches.length > 0 && (
+          <div className="space-y-4">
+            {matches.map((match) => (
+              <div key={match.id} className="bg-gray-800 rounded-xl shadow-md p-5">
+                <div className="flex justify-between items-start mb-3">
+                  <h2 className="text-lg font-semibold text-white">{match.cancha_nombre}</h2>
+                  <span className="text-lg font-bold text-sky-400">
+                    ${match.precio_por_jugador || 0}
+                  </span>
+                </div>
+
+                <div className="space-y-2 text-gray-400 mb-4">
+                  <p className="flex items-center gap-2">
+                    <span>📅</span> {formatDate(match.fecha)}
+                  </p>
+                  <p className="flex items-center gap-2">
+                    <span>📍</span> {match.zona || match.direccion}
+                  </p>
+                  <p className="flex items-center gap-2">
+                    <span>👥</span> {match.jugadores_anotados || 0}/{match.max_jugadores || 14} jugadores
+                  </p>
+                </div>
+
+                <Link
+                  to={`/player/match/${match.id}`}
+                  className="block w-full text-center bg-sky-500 hover:bg-sky-600 text-white font-semibold py-2 rounded-lg transition"
+                >
+                  Ver Partido
+                </Link>
+              </div>
+            ))}
+          </div>
+        )}
       </main>
     </div>
-  )
+  );
 }
 
-export default PlayerHome
+export default PlayerHome;

@@ -1,63 +1,119 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { register } from '../services/auth';
 
 function Register() {
-  const [tipoUsuario, setTipoUsuario] = useState('')
+  const navigate = useNavigate();
+  const [nombre, setNombre] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [tipo, setTipo] = useState('');
+  const [posicion, setPosicion] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const userData = {
+        nombre,
+        email,
+        password,
+        tipo,
+      };
+
+      // Incluir posicion solo si es jugador
+      if (tipo === 'jugador' && posicion) {
+        userData.posicion = posicion;
+      }
+
+      await register(userData);
+      navigate('/');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Error al registrarse');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white">
-      <div className="w-full max-w-md p-8">
+    <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
+      <div className="max-w-md w-full bg-gray-800 rounded-lg p-8">
+        {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-[#75AADB]">Crear Cuenta</h1>
-          <p className="text-black mt-2">Unite a Fulvo</p>
+          <h1 className="text-4xl font-bold text-sky-400">Crear Cuenta</h1>
+          <p className="text-gray-400 mt-2">Unite a Fulvo</p>
         </div>
 
-        <form className="bg-white rounded-2xl shadow-lg p-8 space-y-5">
+        {/* Error message */}
+        {error && (
+          <div className="bg-red-500/20 border border-red-500 text-red-400 px-4 py-3 rounded mb-4">
+            {error}
+          </div>
+        )}
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
+            <label className="block text-gray-300 mb-2">Nombre completo</label>
             <input
               type="text"
-              placeholder="Nombre completo"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#75AADB] focus:border-transparent"
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              className="w-full bg-gray-700 text-white rounded px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-400"
+              placeholder="Tu nombre"
+              required
             />
           </div>
 
           <div>
+            <label className="block text-gray-300 mb-2">Email</label>
             <input
-              type="text"
-              placeholder="Email o teléfono"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#75AADB] focus:border-transparent"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-gray-700 text-white rounded px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-400"
+              placeholder="tu@email.com"
+              required
             />
           </div>
 
           <div>
+            <label className="block text-gray-300 mb-2">Contraseña</label>
             <input
               type="password"
-              placeholder="Contraseña"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#75AADB] focus:border-transparent"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full bg-gray-700 text-white rounded px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-400"
+              placeholder="••••••••"
+              required
             />
           </div>
 
           <div>
-            <p className="text-sm text-gray-600 mb-3">Tipo de cuenta</p>
+            <label className="block text-gray-300 mb-2">Tipo de cuenta</label>
             <div className="flex gap-3">
               <button
                 type="button"
-                onClick={() => setTipoUsuario('jugador')}
-                className={`flex-1 py-3 rounded-lg font-semibold transition-colors ${
-                  tipoUsuario === 'jugador'
-                    ? 'bg-[#75AADB] text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                onClick={() => setTipo('jugador')}
+                className={`flex-1 py-3 rounded font-semibold transition ${
+                  tipo === 'jugador'
+                    ? 'bg-sky-500 text-white'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                 }`}
               >
                 Jugador
               </button>
               <button
                 type="button"
-                onClick={() => setTipoUsuario('dueno')}
-                className={`flex-1 py-3 rounded-lg font-semibold transition-colors ${
-                  tipoUsuario === 'dueno'
-                    ? 'bg-[#75AADB] text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                onClick={() => setTipo('dueno')}
+                className={`flex-1 py-3 rounded font-semibold transition ${
+                  tipo === 'dueno'
+                    ? 'bg-sky-500 text-white'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                 }`}
               >
                 Dueño de Cancha
@@ -65,11 +121,13 @@ function Register() {
             </div>
           </div>
 
-          {tipoUsuario === 'jugador' && (
+          {tipo === 'jugador' && (
             <div>
-              <p className="text-sm text-gray-600 mb-3">Posición preferida</p>
+              <label className="block text-gray-300 mb-2">Posición preferida</label>
               <select
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#75AADB] focus:border-transparent bg-white"
+                value={posicion}
+                onChange={(e) => setPosicion(e.target.value)}
+                className="w-full bg-gray-700 text-white rounded px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-400"
               >
                 <option value="">Seleccionar posición</option>
                 <option value="arquero">Arquero</option>
@@ -82,21 +140,23 @@ function Register() {
 
           <button
             type="submit"
-            className="w-full bg-[#75AADB] text-white font-semibold py-3 rounded-lg hover:bg-[#5a9ad4] transition-colors"
+            disabled={loading || !tipo}
+            className="w-full bg-sky-500 hover:bg-sky-600 disabled:bg-sky-800 disabled:cursor-not-allowed text-white font-semibold py-3 rounded transition"
           >
-            Crear Cuenta
+            {loading ? 'Registrando...' : 'Crear Cuenta'}
           </button>
         </form>
 
-        <p className="text-center mt-6 text-gray-600">
+        {/* Login link */}
+        <p className="text-center text-gray-400 mt-6">
           ¿Ya tenés cuenta?{' '}
-          <Link to="/" className="text-[#75AADB] font-semibold hover:underline">
+          <Link to="/" className="text-sky-400 hover:underline">
             Iniciá sesión
           </Link>
         </p>
       </div>
     </div>
-  )
+  );
 }
 
-export default Register
+export default Register;
