@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { getMyVenues, createVenue, createMatch } from '../services/venues';
+import { getMyVenues, createVenue, createMatch, getMyMatches, setMatchResult } from '../services/venues';
 import { getCurrentUser, logout } from '../services/auth';
 
 function OwnerDashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [venues, setVenues] = useState([]);
+  const [myMatches, setMyMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -14,6 +15,8 @@ function OwnerDashboard() {
   // Forms visibility
   const [showCreateVenue, setShowCreateVenue] = useState(false);
   const [showCreateMatch, setShowCreateMatch] = useState(false);
+  const [showResultModal, setShowResultModal] = useState(false);
+  const [selectedMatch, setSelectedMatch] = useState(null);
 
   // Form states
   const [newVenue, setNewVenue] = useState({
@@ -32,24 +35,32 @@ function OwnerDashboard() {
     max_jugadores: '14'
   });
 
+  // Result modal states
+  const [resultadoLocal, setResultadoLocal] = useState('');
+  const [resultadoVisitante, setResultadoVisitante] = useState('');
+
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     const currentUser = getCurrentUser();
     setUser(currentUser);
-    fetchVenues();
+    fetchData();
   }, []);
 
-  const fetchVenues = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
-      const data = await getMyVenues();
-      setVenues(data);
-      if (data.length > 0) {
-        setNewMatch(prev => ({ ...prev, cancha_id: data[0].id }));
+      const [venuesData, matchesData] = await Promise.all([
+        getMyVenues(),
+        getMyMatches()
+      ]);
+      setVenues(venuesData);
+      setMyMatches(matchesData);
+      if (venuesData.length > 0) {
+        setNewMatch(prev => ({ ...prev, cancha_id: venuesData[0].id }));
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Error al cargar canchas');
+      setError(err.response?.data?.error || 'Error al cargar datos');
     } finally {
       setLoading(false);
     }
@@ -69,7 +80,7 @@ function OwnerDashboard() {
       setSuccess('Cancha creada exitosamente');
       setNewVenue({ nombre: '', direccion: '', zona: '', precio_hora: '' });
       setShowCreateVenue(false);
-      fetchVenues();
+      fetchData();
     } catch (err) {
       setError(err.response?.data?.error || 'Error al crear cancha');
     } finally {
@@ -102,8 +113,42 @@ function OwnerDashboard() {
         max_jugadores: '14'
       });
       setShowCreateMatch(false);
+      fetchData();
     } catch (err) {
       setError(err.response?.data?.error || 'Error al crear partido');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const openResultModal = (match) => {
+    setSelectedMatch(match);
+    setResultadoLocal(match.resultado_local?.toString() || '');
+    setResultadoVisitante(match.resultado_visitante?.toString() || '');
+    setShowResultModal(true);
+  };
+
+  const handleSaveResult = async () => {
+    if (!selectedMatch) return;
+
+    setError('');
+    setSuccess('');
+    setSubmitting(true);
+
+    try {
+      await setMatchResult(
+        selectedMatch.id,
+        Number(resultadoLocal),
+        Number(resultadoVisitante)
+      );
+      setSuccess('Resultado cargado exitosamente');
+      setShowResultModal(false);
+      setSelectedMatch(null);
+      setResultadoLocal('');
+      setResultadoVisitante('');
+      fetchData();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Error al cargar resultado');
     } finally {
       setSubmitting(false);
     }
@@ -113,6 +158,18 @@ function OwnerDashboard() {
     logout();
     navigate('/');
   };
+
+  // Formatear fecha
+  const formatDate = (fecha) => {
+    if (!fecha) return '';
+    const date = new Date(fecha);
+    const options = { weekday: 'short', day: 'numeric', month: 'short' };
+    return date.toLocaleDateString('es-AR', options);
+  };
+
+  // Separar partidos
+  const partidosPendientes = myMatches.filter(m => m.estado_actual === 'pendiente');
+  const partidosPasados = myMatches.filter(m => m.estado_actual === 'pasado' || m.estado_actual === 'jugado');
 
   return (
     <div className="min-h-screen bg-gray-900">
@@ -353,6 +410,82 @@ function OwnerDashboard() {
                 </form>
               </div>
             )}
+
+            {/* My Matches Section */}
+            <div className="mb-8">
+              <h2 className="text-xl font-bold text-white mb-4">Mis Partidos ({myMatches.length})</h2>
+
+              {/* Pending Matches */}
+              {partidosPendientes.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-gray-300 mb-3">Próximos</h3>
+                  <div className="space-y-3">
+                    {partidosPendientes.map((match) => (
+                      <div key={match.id} className="bg-gray-800 rounded-lg p-4">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-semibold text-white">{match.cancha_nombre}</p>
+                            <p className="text-sm text-gray-400">
+                              {formatDate(match.fecha)} · {match.hora_inicio} - {match.hora_fin}
+                            </p>
+                            <p className="text-sm text-gray-400">
+                              👥 {match.jugadores_anotados}/{match.max_jugadores} jugadores
+                            </p>
+                          </div>
+                          <span className="text-xs bg-sky-500/20 text-sky-400 px-2 py-1 rounded">
+                            Pendiente
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Past Matches */}
+              {partidosPasados.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-300 mb-3">Finalizados</h3>
+                  <div className="space-y-3">
+                    {partidosPasados.map((match) => (
+                      <div key={match.id} className="bg-gray-800 rounded-lg p-4">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-semibold text-white">{match.cancha_nombre}</p>
+                            <p className="text-sm text-gray-400">
+                              {formatDate(match.fecha)} · {match.hora_inicio} - {match.hora_fin}
+                            </p>
+                            <p className="text-sm text-gray-400">
+                              👥 {match.jugadores_anotados}/{match.max_jugadores} jugadores
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            {match.estado_actual === 'jugado' && match.resultado_local !== null ? (
+                              <div className="bg-green-500/20 text-green-400 px-3 py-2 rounded">
+                                <span className="font-bold">{match.resultado_local}</span>
+                                <span className="mx-1">-</span>
+                                <span className="font-bold">{match.resultado_visitante}</span>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => openResultModal(match)}
+                                className="bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 px-3 py-2 rounded text-sm font-semibold transition"
+                              >
+                                Cargar Resultado
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {myMatches.length === 0 && (
+                <p className="text-gray-500 text-center py-4">No tenés partidos creados</p>
+              )}
+            </div>
           </>
         )}
 
@@ -364,6 +497,64 @@ function OwnerDashboard() {
           Cerrar Sesión
         </button>
       </main>
+
+      {/* Result Modal */}
+      {showResultModal && selectedMatch && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+          <div className="bg-gray-800 rounded-xl p-6 w-full max-w-md">
+            <h3 className="text-xl font-bold text-white mb-2">Cargar Resultado</h3>
+            <p className="text-gray-400 mb-6">
+              {selectedMatch.cancha_nombre} - {formatDate(selectedMatch.fecha)}
+            </p>
+
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div>
+                <label className="block text-gray-300 mb-2 text-center">Equipo Local</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={resultadoLocal}
+                  onChange={(e) => setResultadoLocal(e.target.value)}
+                  className="w-full bg-gray-700 text-white text-center text-2xl font-bold rounded px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-400"
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <label className="block text-gray-300 mb-2 text-center">Equipo Visitante</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={resultadoVisitante}
+                  onChange={(e) => setResultadoVisitante(e.target.value)}
+                  className="w-full bg-gray-700 text-white text-center text-2xl font-bold rounded px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-400"
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleSaveResult}
+                disabled={submitting || resultadoLocal === '' || resultadoVisitante === ''}
+                className="flex-1 bg-sky-500 hover:bg-sky-600 disabled:bg-sky-800 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition"
+              >
+                {submitting ? 'Guardando...' : 'Guardar'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowResultModal(false);
+                  setSelectedMatch(null);
+                  setResultadoLocal('');
+                  setResultadoVisitante('');
+                }}
+                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 rounded-lg transition"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

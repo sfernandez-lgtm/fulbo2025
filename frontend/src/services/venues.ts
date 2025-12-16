@@ -60,3 +60,22 @@ export const deleteMatch = async (id: string | number) => {
   const response = await api.delete(`/matches/${id}`);
   return response.data;
 };
+
+// Obtener partidos del dueño (organizador)
+export const getMyMatches = async () => {
+  const response = await api.get('/matches/mine');
+  return response.data;
+};
+
+// Cargar resultado de un partido
+export const setMatchResult = async (
+  id: string | number,
+  resultado_local: number,
+  resultado_visitante: number
+) => {
+  const response = await api.put(`/matches/${id}/result`, {
+    resultado_local,
+    resultado_visitante
+  });
+  return response.data;
+};

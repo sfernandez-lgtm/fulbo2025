@@ -54,6 +54,42 @@ router.put('/profile', authMiddleware, async (req, res) => {
   }
 });
 
+// GET /api/players/matches - Obtener partidos del jugador (pasados y futuros)
+router.get('/matches', authMiddleware, async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT
+        p.id,
+        p.fecha,
+        p.hora_inicio,
+        p.hora_fin,
+        p.max_jugadores,
+        p.precio_por_jugador,
+        p.descripcion,
+        c.nombre as cancha_nombre,
+        c.direccion,
+        c.zona,
+        pj.created_at as fecha_inscripcion,
+        CASE
+          WHEN p.fecha < NOW() THEN 'pasado'
+          ELSE 'futuro'
+        END as estado,
+        (SELECT COUNT(*) FROM partido_jugadores WHERE partido_id = p.id) as jugadores_anotados
+       FROM partido_jugadores pj
+       JOIN partidos p ON pj.partido_id = p.id
+       JOIN canchas c ON p.cancha_id = c.id
+       WHERE pj.jugador_id = $1
+       ORDER BY p.fecha ASC`,
+      [req.user.id]
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error obteniendo partidos del jugador:', error);
+    res.status(500).json({ error: 'Error al obtener partidos' });
+  }
+});
+
 // GET /api/players/ranking - Obtener ranking de jugadores
 router.get('/ranking', async (req, res) => {
   try {

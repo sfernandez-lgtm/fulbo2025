@@ -38,6 +38,31 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/matches/mine - Obtener partidos del dueño (organizador)
+router.get('/mine', authMiddleware, isDueno, async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT p.*, c.nombre as cancha_nombre, c.direccion, c.zona,
+              (SELECT COUNT(*) FROM partido_jugadores WHERE partido_id = p.id) as jugadores_anotados,
+              CASE
+                WHEN p.estado = 'jugado' THEN 'jugado'
+                WHEN p.fecha < NOW() THEN 'pasado'
+                ELSE 'pendiente'
+              END as estado_actual
+       FROM partidos p
+       JOIN canchas c ON p.cancha_id = c.id
+       WHERE p.organizador_id = $1
+       ORDER BY p.fecha DESC`,
+      [req.user.id]
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error obteniendo mis partidos:', error);
+    res.status(500).json({ error: 'Error al obtener partidos' });
+  }
+});
+
 // GET /api/matches/:id - Detalle de un partido
 router.get('/:id', async (req, res) => {
   try {
@@ -167,6 +192,53 @@ router.post('/', authMiddleware, isDueno, async (req, res) => {
   } catch (error) {
     console.error('Error creando partido:', error);
     res.status(500).json({ error: 'Error al crear partido' });
+  }
+});
+
+// PUT /api/matches/:id/result - Cargar resultado del partido
+router.put('/:id/result', authMiddleware, isDueno, async (req, res) => {
+  try {
+    const { resultado_local, resultado_visitante } = req.body;
+    const partidoId = req.params.id;
+
+    // Validar que se enviaron los resultados
+    if (resultado_local === undefined || resultado_visitante === undefined) {
+      return res.status(400).json({ error: 'Debe enviar resultado_local y resultado_visitante' });
+    }
+
+    // Verificar que el partido existe y pertenece al organizador
+    const partido = await db.query(
+      'SELECT id, organizador_id FROM partidos WHERE id = $1',
+      [partidoId]
+    );
+
+    if (partido.rows.length === 0) {
+      return res.status(404).json({ error: 'Partido no encontrado' });
+    }
+
+    if (partido.rows[0].organizador_id !== req.user.id) {
+      return res.status(403).json({ error: 'No tenés permiso para modificar este partido' });
+    }
+
+    // Actualizar resultado y estado
+    const result = await db.query(
+      `UPDATE partidos
+       SET resultado_local = $1,
+           resultado_visitante = $2,
+           estado = 'jugado',
+           updated_at = NOW()
+       WHERE id = $3
+       RETURNING *`,
+      [resultado_local, resultado_visitante, partidoId]
+    );
+
+    res.json({
+      message: 'Resultado cargado exitosamente',
+      partido: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error cargando resultado:', error);
+    res.status(500).json({ error: 'Error al cargar resultado' });
   }
 });
 
