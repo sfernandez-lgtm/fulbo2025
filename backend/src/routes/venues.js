@@ -47,6 +47,20 @@ router.get('/my', authMiddleware, isDueno, async (req, res) => {
   }
 });
 
+// GET /api/venues/zones - Obtener zonas únicas de las canchas
+router.get('/zones', async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT DISTINCT zona FROM canchas WHERE zona IS NOT NULL AND zona != '' ORDER BY zona ASC`
+    );
+    const zonas = result.rows.map(row => row.zona);
+    res.json(zonas);
+  } catch (error) {
+    console.error('Error obteniendo zonas:', error);
+    res.status(500).json({ error: 'Error al obtener zonas' });
+  }
+});
+
 // GET /api/venues/:id - Detalle de una cancha
 router.get('/:id', async (req, res) => {
   try {

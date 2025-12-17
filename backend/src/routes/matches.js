@@ -25,7 +25,7 @@ router.get('/', async (req, res) => {
 
     if (zona) {
       params.push(zona);
-      query += ` AND c.zona = $${params.length}`;
+      query += ` AND LOWER(c.zona) LIKE LOWER('%' || $${params.length} || '%')`;
     }
 
     query += ' ORDER BY p.fecha ASC';

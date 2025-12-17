@@ -79,3 +79,9 @@ export const setMatchResult = async (
   });
   return response.data;
 };
+
+// Obtener zonas disponibles
+export const getZones = async () => {
+  const response = await api.get('/venues/zones');
+  return response.data;
+};

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getMyVenues, createVenue, createMatch, getMyMatches, setMatchResult } from '../services/venues';
 import { getCurrentUser, logout } from '../services/auth';
+import { validateWithAI } from '../services/ai';
 
 function OwnerDashboard() {
   const navigate = useNavigate();
@@ -40,6 +41,9 @@ function OwnerDashboard() {
   const [resultadoVisitante, setResultadoVisitante] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
+  const [aiValidation, setAiValidation] = useState(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [validating, setValidating] = useState(false);
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -92,17 +96,41 @@ function OwnerDashboard() {
     e.preventDefault();
     setError('');
     setSuccess('');
-    setSubmitting(true);
+    setValidating(true);
+
+    const matchData = {
+      cancha_id: Number(newMatch.cancha_id),
+      fecha: newMatch.fecha,
+      hora_inicio: newMatch.hora_inicio,
+      hora_fin: newMatch.hora_fin,
+      precio_por_jugador: Number(newMatch.precio_por_jugador) || 0,
+      max_jugadores: Number(newMatch.max_jugadores) || 14
+    };
 
     try {
-      await createMatch({
-        cancha_id: Number(newMatch.cancha_id),
-        fecha: newMatch.fecha,
-        hora_inicio: newMatch.hora_inicio,
-        hora_fin: newMatch.hora_fin,
-        precio_por_jugador: Number(newMatch.precio_por_jugador) || 0,
-        max_jugadores: Number(newMatch.max_jugadores) || 14
-      });
+      // Validar con IA primero
+      const validation = await validateWithAI('match', matchData);
+      setValidating(false);
+
+      if (!validation.valid) {
+        // Mostrar modal de confirmación
+        setAiValidation(validation);
+        setShowConfirmModal(true);
+        return;
+      }
+
+      // Si es válido, crear directamente
+      await createMatchDirectly(matchData);
+    } catch (err) {
+      setValidating(false);
+      setError(err.response?.data?.error || 'Error al validar');
+    }
+  };
+
+  const createMatchDirectly = async (matchData) => {
+    setSubmitting(true);
+    try {
+      await createMatch(matchData);
       setSuccess('Partido creado exitosamente');
       setNewMatch({
         cancha_id: venues[0]?.id || '',
@@ -113,12 +141,26 @@ function OwnerDashboard() {
         max_jugadores: '14'
       });
       setShowCreateMatch(false);
+      setShowConfirmModal(false);
+      setAiValidation(null);
       fetchData();
     } catch (err) {
       setError(err.response?.data?.error || 'Error al crear partido');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleConfirmCreate = () => {
+    const matchData = {
+      cancha_id: Number(newMatch.cancha_id),
+      fecha: newMatch.fecha,
+      hora_inicio: newMatch.hora_inicio,
+      hora_fin: newMatch.hora_fin,
+      precio_por_jugador: Number(newMatch.precio_por_jugador) || 0,
+      max_jugadores: Number(newMatch.max_jugadores) || 14
+    };
+    createMatchDirectly(matchData);
   };
 
   const openResultModal = (match) => {
@@ -394,10 +436,10 @@ function OwnerDashboard() {
                   <div className="flex gap-3">
                     <button
                       type="submit"
-                      disabled={submitting}
+                      disabled={submitting || validating}
                       className="flex-1 bg-sky-500 hover:bg-sky-600 disabled:bg-sky-800 text-white font-semibold py-3 rounded-lg transition"
                     >
-                      {submitting ? 'Creando...' : 'Crear Partido'}
+                      {validating ? 'Validando...' : submitting ? 'Creando...' : 'Crear Partido'}
                     </button>
                     <button
                       type="button"
@@ -550,6 +592,37 @@ function OwnerDashboard() {
                 className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 rounded-lg transition"
               >
                 Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmación IA */}
+      {showConfirmModal && aiValidation && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-xl p-6 max-w-md w-full">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-3xl">⚠️</span>
+              <h3 className="text-xl font-bold text-white">Verificación IA</h3>
+            </div>
+            <p className="text-gray-300 mb-6">{aiValidation.message}</p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleConfirmCreate}
+                disabled={submitting}
+                className="flex-1 bg-sky-500 hover:bg-sky-600 disabled:bg-sky-800 text-white font-semibold py-3 rounded-lg transition"
+              >
+                {submitting ? 'Creando...' : 'Crear igual'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowConfirmModal(false);
+                  setAiValidation(null);
+                }}
+                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 rounded-lg transition"
+              >
+                Corregir
               </button>
             </div>
           </div>
