@@ -11,6 +11,8 @@ function MatchDetail() {
   const [joining, setJoining] = useState(false);
   const [joined, setJoined] = useState(false);
   const [success, setSuccess] = useState('');
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [leaving, setLeaving] = useState(false);
 
   const currentUser = getCurrentUser();
 
@@ -53,21 +55,48 @@ function MatchDetail() {
     }
   };
 
-  const handleLeave = async () => {
+  // Calcular si faltan menos de 3 horas para el partido
+  const getHorasHastaPartido = () => {
+    if (!match?.fecha || !match?.hora_inicio) return null;
+
+    const fechaPartido = new Date(match.fecha);
+    const [horas, minutos] = match.hora_inicio.split(':');
+    fechaPartido.setHours(parseInt(horas), parseInt(minutos), 0, 0);
+
+    const ahora = new Date();
+    const horasHasta = (fechaPartido - ahora) / (1000 * 60 * 60);
+    return horasHasta;
+  };
+
+  const hayPenalizacion = () => {
+    const horas = getHorasHastaPartido();
+    return horas !== null && horas < 3 && horas > 0;
+  };
+
+  const handleLeaveClick = () => {
+    setShowLeaveConfirm(true);
+  };
+
+  const handleLeaveConfirm = async () => {
     setError('');
     setSuccess('');
-    setJoining(true);
+    setLeaving(true);
 
     try {
-      await leaveMatch(id);
+      const result = await leaveMatch(id);
       setJoined(false);
-      setSuccess('Saliste del partido');
+      setShowLeaveConfirm(false);
+      setSuccess(result.message || 'Saliste del partido');
       fetchMatch();
     } catch (err) {
       setError(err.response?.data?.error || 'Error al salir del partido');
     } finally {
-      setJoining(false);
+      setLeaving(false);
     }
+  };
+
+  const handleLeaveCancel = () => {
+    setShowLeaveConfirm(false);
   };
 
   // Formatear fecha
@@ -212,12 +241,17 @@ function MatchDetail() {
             <div className="w-full bg-green-500/20 border border-green-500 text-green-400 font-semibold py-4 rounded-xl text-center">
               ✓ Ya estás anotado
             </div>
+            {hayPenalizacion() && (
+              <div className="bg-yellow-500/20 border border-yellow-500 text-yellow-400 px-4 py-3 rounded-xl text-sm">
+                ⚠️ Te descontarán 15 puntos por salir tan cerca del partido
+              </div>
+            )}
             <button
-              onClick={handleLeave}
-              disabled={joining}
+              onClick={handleLeaveClick}
+              disabled={leaving}
               className="w-full bg-red-500 hover:bg-red-600 disabled:bg-red-800 text-white font-semibold py-3 rounded-xl transition"
             >
-              {joining ? 'Saliendo...' : 'Salir del partido'}
+              {leaving ? 'Saliendo...' : 'Salir del partido'}
             </button>
           </div>
         ) : partidoLleno ? (
@@ -237,6 +271,45 @@ function MatchDetail() {
           </button>
         )}
       </main>
+
+      {/* Modal de confirmación para salir */}
+      {showLeaveConfirm && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+          <div className="bg-gray-800 rounded-xl p-6 w-full max-w-md">
+            <h3 className="text-xl font-bold text-white mb-4">¿Salir del partido?</h3>
+
+            {hayPenalizacion() ? (
+              <div className="bg-red-500/20 border border-red-500 text-red-400 px-4 py-3 rounded-lg mb-4">
+                <p className="font-semibold mb-1">⚠️ Atención</p>
+                <p className="text-sm">
+                  Faltan menos de 3 horas para el partido. Se te descontarán <strong>15 puntos</strong> de ranking por salir ahora.
+                </p>
+              </div>
+            ) : (
+              <p className="text-gray-400 mb-4">
+                ¿Estás seguro que querés salir de este partido?
+              </p>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleLeaveConfirm}
+                disabled={leaving}
+                className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-red-800 text-white font-semibold py-3 rounded-lg transition"
+              >
+                {leaving ? 'Saliendo...' : hayPenalizacion() ? 'Salir (-15 pts)' : 'Sí, salir'}
+              </button>
+              <button
+                onClick={handleLeaveCancel}
+                disabled={leaving}
+                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 rounded-lg transition"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -144,19 +144,101 @@ router.post('/:id/join', authMiddleware, isJugador, async (req, res) => {
   }
 });
 
-// POST /api/matches/:id/leave - Salir de un partido
-router.post('/:id/leave', authMiddleware, isJugador, async (req, res) => {
+// DELETE /api/matches/:id/leave - Salir de un partido (con penalización si es muy tarde)
+router.delete('/:id/leave', authMiddleware, isJugador, async (req, res) => {
   try {
-    const result = await db.query(
-      'DELETE FROM partido_jugadores WHERE partido_id = $1 AND jugador_id = $2 RETURNING id',
-      [req.params.id, req.user.id]
+    const partidoId = req.params.id;
+    const jugadorId = req.user.id;
+
+    // Verificar que el partido existe y obtener fecha/hora
+    const partido = await db.query(
+      `SELECT id, fecha, hora_inicio, estado FROM partidos WHERE id = $1`,
+      [partidoId]
     );
 
-    if (result.rows.length === 0) {
+    if (partido.rows.length === 0) {
+      return res.status(404).json({ error: 'Partido no encontrado' });
+    }
+
+    const p = partido.rows[0];
+
+    // Verificar que el partido no esté jugado
+    if (p.estado === 'jugado') {
+      return res.status(400).json({ error: 'No podés salir de un partido ya jugado' });
+    }
+
+    // Verificar que el jugador está anotado
+    const inscripcion = await db.query(
+      'SELECT id FROM partido_jugadores WHERE partido_id = $1 AND jugador_id = $2',
+      [partidoId, jugadorId]
+    );
+
+    if (inscripcion.rows.length === 0) {
       return res.status(400).json({ error: 'No estás anotado en este partido' });
     }
 
-    res.json({ message: 'Saliste del partido exitosamente' });
+    // Calcular tiempo hasta el partido
+    const fechaPartido = new Date(p.fecha);
+    const [horas, minutos] = p.hora_inicio.split(':');
+    fechaPartido.setHours(parseInt(horas), parseInt(minutos), 0, 0);
+
+    const ahora = new Date();
+    const horasHastaPartido = (fechaPartido - ahora) / (1000 * 60 * 60);
+
+    // Determinar si hay penalización (menos de 3 horas)
+    const hayPenalizacion = horasHastaPartido < 3 && horasHastaPartido > 0;
+    const penalizacion = 15;
+
+    // Iniciar transacción
+    await db.query('BEGIN');
+
+    try {
+      // Si hay penalización, restar puntos de ranking
+      if (hayPenalizacion) {
+        await db.query(
+          `UPDATE usuarios
+           SET ranking = GREATEST(0, COALESCE(ranking, 50) - $1)
+           WHERE id = $2`,
+          [penalizacion, jugadorId]
+        );
+      }
+
+      // Eliminar al jugador del partido
+      await db.query(
+        'DELETE FROM partido_jugadores WHERE partido_id = $1 AND jugador_id = $2',
+        [partidoId, jugadorId]
+      );
+
+      // Si había equipos asignados, limpiar el campo equipo de todos
+      const equiposAsignados = await db.query(
+        `SELECT id FROM partido_jugadores WHERE partido_id = $1 AND equipo IS NOT NULL LIMIT 1`,
+        [partidoId]
+      );
+
+      if (equiposAsignados.rows.length > 0) {
+        await db.query(
+          'UPDATE partido_jugadores SET equipo = NULL WHERE partido_id = $1',
+          [partidoId]
+        );
+      }
+
+      // Confirmar transacción
+      await db.query('COMMIT');
+
+      const mensaje = hayPenalizacion
+        ? `Saliste del partido. Se te descontaron ${penalizacion} puntos por salir con menos de 3 horas de anticipación.`
+        : 'Saliste del partido exitosamente';
+
+      res.json({
+        message: mensaje,
+        penalizacion: hayPenalizacion,
+        puntosDescontados: hayPenalizacion ? penalizacion : 0,
+        equiposReseteados: equiposAsignados.rows.length > 0
+      });
+    } catch (error) {
+      await db.query('ROLLBACK');
+      throw error;
+    }
   } catch (error) {
     console.error('Error saliendo del partido:', error);
     res.status(500).json({ error: 'Error al salir del partido' });

@@ -23,8 +23,8 @@ export const joinMatch = async (id: string | number) => {
   return response.data;
 };
 
-// Salir de un partido
+// Salir de un partido (DELETE con penalización si es tarde)
 export const leaveMatch = async (id: string | number) => {
-  const response = await api.post(`/matches/${id}/leave`);
+  const response = await api.delete(`/matches/${id}/leave`);
   return response.data;
 };
