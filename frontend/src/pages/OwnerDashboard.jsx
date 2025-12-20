@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { getMyVenues, createVenue, createMatch, getMyMatches, setMatchResult } from '../services/venues';
+import { getMyVenues, createVenue, createMatch, getMyMatches, setMatchResult, getMatchDetail, assignTeams } from '../services/venues';
 import { getCurrentUser, logout } from '../services/auth';
 import { validateWithAI } from '../services/ai';
 
@@ -18,6 +18,11 @@ function OwnerDashboard() {
   const [showCreateMatch, setShowCreateMatch] = useState(false);
   const [showResultModal, setShowResultModal] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState(null);
+  const [showMatchDetail, setShowMatchDetail] = useState(false);
+  const [matchDetail, setMatchDetail] = useState(null);
+  const [equipos, setEquipos] = useState(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [assigningTeams, setAssigningTeams] = useState(false);
 
   // Form states
   const [newVenue, setNewVenue] = useState({
@@ -161,6 +166,65 @@ function OwnerDashboard() {
       max_jugadores: Number(newMatch.max_jugadores) || 14
     };
     createMatchDirectly(matchData);
+  };
+
+  const openMatchDetail = async (match) => {
+    setSelectedMatch(match);
+    setShowMatchDetail(true);
+    setLoadingDetail(true);
+    setEquipos(null);
+    setError('');
+
+    try {
+      const detail = await getMatchDetail(match.id);
+      setMatchDetail(detail);
+
+      // Verificar si ya hay equipos asignados
+      const jugadoresConEquipo = detail.jugadores?.filter(j => j.equipo) || [];
+      if (jugadoresConEquipo.length > 0) {
+        const local = detail.jugadores.filter(j => j.equipo === 'local');
+        const visitante = detail.jugadores.filter(j => j.equipo === 'visitante');
+        setEquipos({ local, visitante });
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || 'Error al cargar detalle del partido');
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
+  const handleAssignTeams = async () => {
+    if (!selectedMatch) return;
+
+    setAssigningTeams(true);
+    setError('');
+
+    try {
+      const result = await assignTeams(selectedMatch.id);
+      setEquipos({
+        local: result.equipos.local.jugadores,
+        visitante: result.equipos.visitante.jugadores
+      });
+      setSuccess('Equipos asignados exitosamente');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Error al asignar equipos');
+    } finally {
+      setAssigningTeams(false);
+    }
+  };
+
+  const closeMatchDetail = () => {
+    setShowMatchDetail(false);
+    setSelectedMatch(null);
+    setMatchDetail(null);
+    setEquipos(null);
+  };
+
+  const openResultFromDetail = () => {
+    setShowMatchDetail(false);
+    setResultadoLocal('');
+    setResultadoVisitante('');
+    setShowResultModal(true);
   };
 
   const openResultModal = (match) => {
@@ -463,7 +527,11 @@ function OwnerDashboard() {
                   <h3 className="text-lg font-semibold text-gray-300 mb-3">Próximos</h3>
                   <div className="space-y-3">
                     {partidosPendientes.map((match) => (
-                      <div key={match.id} className="bg-gray-800 rounded-lg p-4">
+                      <div
+                        key={match.id}
+                        className="bg-gray-800 rounded-lg p-4 cursor-pointer hover:bg-gray-750 transition"
+                        onClick={() => openMatchDetail(match)}
+                      >
                         <div className="flex justify-between items-start">
                           <div>
                             <p className="font-semibold text-white">{match.cancha_nombre}</p>
@@ -490,7 +558,11 @@ function OwnerDashboard() {
                   <h3 className="text-lg font-semibold text-gray-300 mb-3">Finalizados</h3>
                   <div className="space-y-3">
                     {partidosPasados.map((match) => (
-                      <div key={match.id} className="bg-gray-800 rounded-lg p-4">
+                      <div
+                        key={match.id}
+                        className="bg-gray-800 rounded-lg p-4 cursor-pointer hover:bg-gray-750 transition"
+                        onClick={() => openMatchDetail(match)}
+                      >
                         <div className="flex justify-between items-start">
                           <div>
                             <p className="font-semibold text-white">{match.cancha_nombre}</p>
@@ -510,7 +582,10 @@ function OwnerDashboard() {
                               </div>
                             ) : (
                               <button
-                                onClick={() => openResultModal(match)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openResultModal(match);
+                                }}
                                 className="bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 px-3 py-2 rounded text-sm font-semibold transition"
                               >
                                 Cargar Resultado
@@ -539,6 +614,131 @@ function OwnerDashboard() {
           Cerrar Sesión
         </button>
       </main>
+
+      {/* Match Detail Modal */}
+      {showMatchDetail && selectedMatch && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+          <div className="bg-gray-800 rounded-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-xl font-bold text-white">{selectedMatch.cancha_nombre}</h3>
+                <p className="text-gray-400">
+                  {formatDate(selectedMatch.fecha)} · {selectedMatch.hora_inicio} - {selectedMatch.hora_fin}
+                </p>
+              </div>
+              <button
+                onClick={closeMatchDetail}
+                className="text-gray-400 hover:text-white text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            {loadingDetail ? (
+              <div className="text-center text-gray-400 py-8">Cargando...</div>
+            ) : (
+              <>
+                {/* Jugadores anotados */}
+                <div className="mb-6">
+                  <p className="text-gray-300 mb-2">
+                    👥 {matchDetail?.jugadores?.length || 0}/{selectedMatch.max_jugadores} jugadores anotados
+                  </p>
+                </div>
+
+                {/* Equipos si están asignados */}
+                {equipos ? (
+                  <div className="mb-6">
+                    <h4 className="text-lg font-semibold text-white mb-3">Equipos</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-blue-500/20 rounded-lg p-3">
+                        <h5 className="text-blue-400 font-semibold mb-2 text-center">Local</h5>
+                        <ul className="space-y-1">
+                          {equipos.local.map((j) => (
+                            <li key={j.id} className="text-gray-300 text-sm">
+                              {j.nombre}
+                              {j.ranking && <span className="text-gray-500 ml-1">({j.ranking})</span>}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div className="bg-red-500/20 rounded-lg p-3">
+                        <h5 className="text-red-400 font-semibold mb-2 text-center">Visitante</h5>
+                        <ul className="space-y-1">
+                          {equipos.visitante.map((j) => (
+                            <li key={j.id} className="text-gray-300 text-sm">
+                              {j.nombre}
+                              {j.ranking && <span className="text-gray-500 ml-1">({j.ranking})</span>}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* Lista de jugadores sin equipo */
+                  matchDetail?.jugadores?.length > 0 && (
+                    <div className="mb-6">
+                      <h4 className="text-lg font-semibold text-white mb-3">Jugadores</h4>
+                      <ul className="space-y-1">
+                        {matchDetail.jugadores.map((j) => (
+                          <li key={j.id} className="text-gray-300 text-sm">
+                            {j.nombre} {j.posicion && <span className="text-gray-500">({j.posicion})</span>}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )
+                )}
+
+                {/* Resultado si ya está cargado */}
+                {selectedMatch.estado_actual === 'jugado' && selectedMatch.resultado_local !== null && (
+                  <div className="mb-6 text-center">
+                    <h4 className="text-lg font-semibold text-white mb-2">Resultado</h4>
+                    <div className="bg-green-500/20 text-green-400 px-6 py-3 rounded-lg inline-block">
+                      <span className="text-3xl font-bold">{selectedMatch.resultado_local}</span>
+                      <span className="mx-3 text-xl">-</span>
+                      <span className="text-3xl font-bold">{selectedMatch.resultado_visitante}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Botones de acción */}
+                <div className="space-y-3">
+                  {/* Botón Asignar Equipos: solo si NO está jugado y tiene jugadores */}
+                  {selectedMatch.estado_actual !== 'jugado' &&
+                   matchDetail?.jugadores?.length >= 2 &&
+                   !equipos && (
+                    <button
+                      onClick={handleAssignTeams}
+                      disabled={assigningTeams}
+                      className="w-full bg-purple-500 hover:bg-purple-600 disabled:bg-purple-800 text-white font-semibold py-3 rounded-lg transition"
+                    >
+                      {assigningTeams ? 'Asignando...' : 'Asignar Equipos'}
+                    </button>
+                  )}
+
+                  {/* Botón Cargar Resultado: si tiene equipos y no está jugado */}
+                  {equipos && selectedMatch.estado_actual !== 'jugado' && (
+                    <button
+                      onClick={openResultFromDetail}
+                      className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-semibold py-3 rounded-lg transition"
+                    >
+                      Cargar Resultado
+                    </button>
+                  )}
+
+                  <button
+                    onClick={closeMatchDetail}
+                    className="w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 rounded-lg transition"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Result Modal */}
       {showResultModal && selectedMatch && (

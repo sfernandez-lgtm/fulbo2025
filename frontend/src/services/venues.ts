@@ -85,3 +85,15 @@ export const getZones = async () => {
   const response = await api.get('/venues/zones');
   return response.data;
 };
+
+// Obtener detalle de un partido (con jugadores)
+export const getMatchDetail = async (id: string | number) => {
+  const response = await api.get(`/matches/${id}`);
+  return response.data;
+};
+
+// Asignar equipos a un partido
+export const assignTeams = async (id: string | number) => {
+  const response = await api.post(`/matches/${id}/assign-teams`);
+  return response.data;
+};

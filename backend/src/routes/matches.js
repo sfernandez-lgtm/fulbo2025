@@ -220,22 +220,113 @@ router.put('/:id/result', authMiddleware, isDueno, async (req, res) => {
       return res.status(403).json({ error: 'No tenés permiso para modificar este partido' });
     }
 
-    // Actualizar resultado y estado
-    const result = await db.query(
-      `UPDATE partidos
-       SET resultado_local = $1,
-           resultado_visitante = $2,
-           estado = 'jugado',
-           updated_at = NOW()
-       WHERE id = $3
-       RETURNING *`,
-      [resultado_local, resultado_visitante, partidoId]
+    // Verificar si hay equipos asignados
+    const jugadoresConEquipo = await db.query(
+      `SELECT pj.jugador_id, pj.equipo
+       FROM partido_jugadores pj
+       WHERE pj.partido_id = $1 AND pj.equipo IN ('local', 'visitante')`,
+      [partidoId]
     );
 
-    res.json({
-      message: 'Resultado cargado exitosamente',
-      partido: result.rows[0]
-    });
+    const equiposAsignados = jugadoresConEquipo.rows.length > 0;
+
+    // Iniciar transacción
+    await db.query('BEGIN');
+
+    try {
+      // Actualizar resultado y estado del partido
+      const result = await db.query(
+        `UPDATE partidos
+         SET resultado_local = $1,
+             resultado_visitante = $2,
+             estado = 'jugado',
+             updated_at = NOW()
+         WHERE id = $3
+         RETURNING *`,
+        [resultado_local, resultado_visitante, partidoId]
+      );
+
+      let statsActualizadas = false;
+
+      if (equiposAsignados) {
+        // Determinar resultado
+        const ganoLocal = resultado_local > resultado_visitante;
+        const ganoVisitante = resultado_visitante > resultado_local;
+        const empate = resultado_local === resultado_visitante;
+
+        // Obtener todos los jugadores del partido con su equipo
+        const jugadores = jugadoresConEquipo.rows;
+
+        // Separar por equipo
+        const jugadoresLocal = jugadores.filter(j => j.equipo === 'local').map(j => j.jugador_id);
+        const jugadoresVisitante = jugadores.filter(j => j.equipo === 'visitante').map(j => j.jugador_id);
+        const todosLosJugadores = [...jugadoresLocal, ...jugadoresVisitante];
+
+        if (todosLosJugadores.length > 0) {
+          // Actualizar partidos_jugados para TODOS los jugadores
+          await db.query(
+            `UPDATE usuarios
+             SET partidos_jugados = COALESCE(partidos_jugados, 0) + 1
+             WHERE id = ANY($1)`,
+            [todosLosJugadores]
+          );
+
+          if (empate) {
+            // Empate: todos ranking += 3
+            await db.query(
+              `UPDATE usuarios
+               SET ranking = COALESCE(ranking, 50) + 3
+               WHERE id = ANY($1)`,
+              [todosLosJugadores]
+            );
+          } else {
+            // Determinar ganadores y perdedores
+            const ganadores = ganoLocal ? jugadoresLocal : jugadoresVisitante;
+            const perdedores = ganoLocal ? jugadoresVisitante : jugadoresLocal;
+
+            // Actualizar ganadores: ranking += 10, partidos_ganados += 1
+            if (ganadores.length > 0) {
+              await db.query(
+                `UPDATE usuarios
+                 SET ranking = COALESCE(ranking, 50) + 10,
+                     partidos_ganados = COALESCE(partidos_ganados, 0) + 1
+                 WHERE id = ANY($1)`,
+                [ganadores]
+              );
+            }
+
+            // Actualizar perdedores: ranking -= 5 (mínimo 0)
+            if (perdedores.length > 0) {
+              await db.query(
+                `UPDATE usuarios
+                 SET ranking = GREATEST(0, COALESCE(ranking, 50) - 5)
+                 WHERE id = ANY($1)`,
+                [perdedores]
+              );
+            }
+          }
+
+          statsActualizadas = true;
+        }
+      }
+
+      // Confirmar transacción
+      await db.query('COMMIT');
+
+      const mensaje = statsActualizadas
+        ? 'Resultado cargado y estadísticas actualizadas exitosamente'
+        : 'Resultado cargado exitosamente (equipos no asignados, rankings no actualizados)';
+
+      res.json({
+        message: mensaje,
+        partido: result.rows[0],
+        statsActualizadas
+      });
+    } catch (error) {
+      // Rollback en caso de error
+      await db.query('ROLLBACK');
+      throw error;
+    }
   } catch (error) {
     console.error('Error cargando resultado:', error);
     res.status(500).json({ error: 'Error al cargar resultado' });
@@ -258,6 +349,119 @@ router.delete('/:id', authMiddleware, isDueno, async (req, res) => {
   } catch (error) {
     console.error('Error cancelando partido:', error);
     res.status(500).json({ error: 'Error al cancelar partido' });
+  }
+});
+
+// POST /api/matches/:id/assign-teams - Armar equipos balanceados por ranking (draft snake)
+router.post('/:id/assign-teams', authMiddleware, isDueno, async (req, res) => {
+  try {
+    const partidoId = req.params.id;
+
+    // Verificar que el partido existe y pertenece al organizador
+    const partido = await db.query(
+      'SELECT id, organizador_id, estado FROM partidos WHERE id = $1',
+      [partidoId]
+    );
+
+    if (partido.rows.length === 0) {
+      return res.status(404).json({ error: 'Partido no encontrado' });
+    }
+
+    if (partido.rows[0].organizador_id !== req.user.id) {
+      return res.status(403).json({ error: 'No tenés permiso para modificar este partido' });
+    }
+
+    if (partido.rows[0].estado === 'jugado') {
+      return res.status(400).json({ error: 'No se pueden reasignar equipos de un partido ya jugado' });
+    }
+
+    // Obtener jugadores anotados ordenados por ranking (mayor a menor)
+    const jugadoresResult = await db.query(
+      `SELECT pj.id as partido_jugador_id, u.id, u.nombre, u.posicion,
+              COALESCE(u.ranking, 50) as ranking
+       FROM partido_jugadores pj
+       JOIN usuarios u ON pj.jugador_id = u.id
+       WHERE pj.partido_id = $1
+       ORDER BY COALESCE(u.ranking, 50) DESC`,
+      [partidoId]
+    );
+
+    const jugadores = jugadoresResult.rows;
+
+    if (jugadores.length < 2) {
+      return res.status(400).json({ error: 'Se necesitan al menos 2 jugadores para armar equipos' });
+    }
+
+    // Draft snake: 1→local, 2→visitante, 3→visitante, 4→local, 5→local, 6→visitante...
+    const equipoLocal = [];
+    const equipoVisitante = [];
+
+    jugadores.forEach((jugador, index) => {
+      // Determinar en qué "ronda" estamos (cada ronda tiene 2 picks)
+      const ronda = Math.floor(index / 2);
+      const posicionEnRonda = index % 2;
+
+      // En rondas pares (0, 2, 4...): primero local, luego visitante
+      // En rondas impares (1, 3, 5...): primero visitante, luego local
+      let equipo;
+      if (ronda % 2 === 0) {
+        equipo = posicionEnRonda === 0 ? 'local' : 'visitante';
+      } else {
+        equipo = posicionEnRonda === 0 ? 'visitante' : 'local';
+      }
+
+      jugador.equipo = equipo;
+      if (equipo === 'local') {
+        equipoLocal.push(jugador);
+      } else {
+        equipoVisitante.push(jugador);
+      }
+    });
+
+    // Actualizar el campo equipo en partido_jugadores
+    for (const jugador of jugadores) {
+      await db.query(
+        'UPDATE partido_jugadores SET equipo = $1 WHERE id = $2',
+        [jugador.equipo, jugador.partido_jugador_id]
+      );
+    }
+
+    // Calcular ranking promedio de cada equipo
+    const rankingPromedioLocal = equipoLocal.length > 0
+      ? equipoLocal.reduce((sum, j) => sum + parseFloat(j.ranking), 0) / equipoLocal.length
+      : 0;
+
+    const rankingPromedioVisitante = equipoVisitante.length > 0
+      ? equipoVisitante.reduce((sum, j) => sum + parseFloat(j.ranking), 0) / equipoVisitante.length
+      : 0;
+
+    res.json({
+      message: 'Equipos asignados exitosamente',
+      equipos: {
+        local: {
+          jugadores: equipoLocal.map(j => ({
+            id: j.id,
+            nombre: j.nombre,
+            posicion: j.posicion,
+            ranking: parseFloat(j.ranking)
+          })),
+          rankingPromedio: Math.round(rankingPromedioLocal * 100) / 100
+        },
+        visitante: {
+          jugadores: equipoVisitante.map(j => ({
+            id: j.id,
+            nombre: j.nombre,
+            posicion: j.posicion,
+            ranking: parseFloat(j.ranking)
+          })),
+          rankingPromedio: Math.round(rankingPromedioVisitante * 100) / 100
+        }
+      },
+      diferencia: Math.round(Math.abs(rankingPromedioLocal - rankingPromedioVisitante) * 100) / 100
+    });
+  } catch (error) {
+    console.error('Error asignando equipos:', error);
+    res.status(500).json({ error: 'Error al asignar equipos' });
   }
 });
 
