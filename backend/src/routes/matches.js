@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../config/db');
 const { authMiddleware, isDueno, isJugador } = require('../middleware/auth');
+const { actualizarPuntosTemporada } = require('./leagues');
 
 const router = express.Router();
 
@@ -428,6 +429,11 @@ router.put('/:id/result', authMiddleware, isDueno, async (req, res) => {
                WHERE id = ANY($1)`,
               [todosLosJugadores]
             );
+
+            // Actualizar puntos de temporada para empate
+            for (const jugadorId of todosLosJugadores) {
+              await actualizarPuntosTemporada(jugadorId, 3, false);
+            }
           } else {
             // Determinar ganadores y perdedores
             const ganadores = ganoLocal ? jugadoresLocal : jugadoresVisitante;
@@ -442,6 +448,11 @@ router.put('/:id/result', authMiddleware, isDueno, async (req, res) => {
                  WHERE id = ANY($1)`,
                 [ganadores]
               );
+
+              // Actualizar puntos de temporada para ganadores
+              for (const jugadorId of ganadores) {
+                await actualizarPuntosTemporada(jugadorId, 10, true);
+              }
             }
 
             // Actualizar perdedores: ranking -= 5 (mínimo 0)
@@ -452,6 +463,11 @@ router.put('/:id/result', authMiddleware, isDueno, async (req, res) => {
                  WHERE id = ANY($1)`,
                 [perdedores]
               );
+
+              // Actualizar puntos de temporada para perdedores (pierden 5 puntos)
+              for (const jugadorId of perdedores) {
+                await actualizarPuntosTemporada(jugadorId, -5, false);
+              }
             }
           }
 
