@@ -4,6 +4,7 @@ import { getMyVenues, createVenue, createMatch, getMyMatches, setMatchResult, ge
 import { getCurrentUser, logout } from '../services/auth';
 import { validateWithAI } from '../services/ai';
 import { createSubscription } from '../services/payments';
+import { confirmPayment, blockPlayer } from '../services/matches';
 
 function OwnerDashboard() {
   const navigate = useNavigate();
@@ -55,6 +56,10 @@ function OwnerDashboard() {
   const [suscripcionActiva, setSuscripcionActiva] = useState(false);
   const [suscripcionVence, setSuscripcionVence] = useState(null);
   const [activandoSuscripcion, setActivandoSuscripcion] = useState(false);
+
+  // Payment confirmation states
+  const [confirmingPayment, setConfirmingPayment] = useState(null);
+  const [blockingPlayer, setBlockingPlayer] = useState(null);
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -262,6 +267,67 @@ function OwnerDashboard() {
     setSelectedMatch(null);
     setMatchDetail(null);
     setEquipos(null);
+  };
+
+  // Handler para confirmar pago de un jugador
+  const handleConfirmPayment = async (playerId) => {
+    if (!selectedMatch) return;
+
+    setConfirmingPayment(playerId);
+    setError('');
+
+    try {
+      await confirmPayment(selectedMatch.id, playerId);
+      // Actualizar el estado local del jugador
+      setMatchDetail(prev => ({
+        ...prev,
+        jugadores: prev.jugadores.map(j =>
+          j.id === playerId ? { ...j, pago_confirmado: true } : j
+        )
+      }));
+      setSuccess('Pago confirmado');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Error al confirmar pago');
+    } finally {
+      setConfirmingPayment(null);
+    }
+  };
+
+  // Handler para bloquear jugador por no pagar
+  const handleBlockPlayer = async (playerId, playerName) => {
+    if (!selectedMatch) return;
+
+    const confirmar = window.confirm(`¿Estás seguro de bloquear a ${playerName}? No podrá anotarse a nuevos partidos.`);
+    if (!confirmar) return;
+
+    setBlockingPlayer(playerId);
+    setError('');
+
+    try {
+      await blockPlayer(selectedMatch.id, playerId);
+      setSuccess(`Cuenta de ${playerName} bloqueada`);
+      // Refrescar detalle del partido
+      const detail = await getMatchDetail(selectedMatch.id);
+      setMatchDetail(detail);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Error al bloquear jugador');
+    } finally {
+      setBlockingPlayer(null);
+    }
+  };
+
+  // Calcular totales de recaudación
+  const calcularRecaudacion = () => {
+    if (!matchDetail?.jugadores || !selectedMatch?.precio_por_jugador) return { recaudado: 0, esperado: 0 };
+    const pagados = matchDetail.jugadores.filter(j => j.pago_confirmado).length;
+    const total = matchDetail.jugadores.length;
+    const precio = selectedMatch.precio_por_jugador || 0;
+    return {
+      recaudado: pagados * precio,
+      esperado: total * precio,
+      pagados,
+      total
+    };
   };
 
   const openResultFromDetail = () => {
@@ -716,15 +782,81 @@ function OwnerDashboard() {
               <div className="text-center text-gray-400 py-8">Cargando...</div>
             ) : (
               <>
-                {/* Jugadores anotados */}
-                <div className="mb-6">
-                  <p className="text-gray-300 mb-2">
-                    👥 {matchDetail?.jugadores?.length || 0}/{selectedMatch.max_jugadores} jugadores anotados
-                  </p>
-                </div>
+                {/* Resumen de recaudación */}
+                {matchDetail?.jugadores?.length > 0 && (
+                  <div className="bg-gray-700/50 rounded-lg p-4 mb-6">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-gray-400 text-sm">Recaudación</p>
+                        <p className="text-white font-bold text-xl">
+                          ${calcularRecaudacion().recaudado.toLocaleString()} / ${calcularRecaudacion().esperado.toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-gray-400 text-sm">Pagos confirmados</p>
+                        <p className="text-white font-bold text-xl">
+                          {calcularRecaudacion().pagados}/{calcularRecaudacion().total}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Lista de jugadores con estado de pago */}
+                {matchDetail?.jugadores?.length > 0 && (
+                  <div className="mb-6">
+                    <h4 className="text-lg font-semibold text-white mb-3">
+                      Jugadores ({matchDetail.jugadores.length}/{selectedMatch.max_jugadores})
+                    </h4>
+                    <div className="space-y-2">
+                      {matchDetail.jugadores.map((j) => (
+                        <div key={j.id} className="bg-gray-700/50 rounded-lg p-3 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div>
+                              <p className="text-white font-medium">{j.nombre}</p>
+                              <p className="text-gray-400 text-xs">
+                                {j.posicion || 'Sin posición'}
+                                {j.ranking && ` · Ranking: ${j.ranking}`}
+                                {j.equipo && (
+                                  <span className={j.equipo === 'local' ? ' text-blue-400' : ' text-red-400'}>
+                                    {' '}· {j.equipo === 'local' ? 'Local' : 'Visitante'}
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {j.pago_confirmado ? (
+                              <span className="bg-green-500/20 text-green-400 px-3 py-1 rounded-lg text-sm font-semibold">
+                                Pagó
+                              </span>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => handleConfirmPayment(j.id)}
+                                  disabled={confirmingPayment === j.id}
+                                  className="bg-green-500 hover:bg-green-600 disabled:bg-green-800 text-white px-3 py-1 rounded-lg text-sm font-semibold transition"
+                                >
+                                  {confirmingPayment === j.id ? '...' : 'Confirmar'}
+                                </button>
+                                <button
+                                  onClick={() => handleBlockPlayer(j.id, j.nombre)}
+                                  disabled={blockingPlayer === j.id}
+                                  className="bg-red-500 hover:bg-red-600 disabled:bg-red-800 text-white px-3 py-1 rounded-lg text-sm font-semibold transition"
+                                >
+                                  {blockingPlayer === j.id ? '...' : 'No pagó'}
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Equipos si están asignados */}
-                {equipos ? (
+                {equipos && (
                   <div className="mb-6">
                     <h4 className="text-lg font-semibold text-white mb-3">Equipos</h4>
                     <div className="grid grid-cols-2 gap-4">
@@ -752,20 +884,6 @@ function OwnerDashboard() {
                       </div>
                     </div>
                   </div>
-                ) : (
-                  /* Lista de jugadores sin equipo */
-                  matchDetail?.jugadores?.length > 0 && (
-                    <div className="mb-6">
-                      <h4 className="text-lg font-semibold text-white mb-3">Jugadores</h4>
-                      <ul className="space-y-1">
-                        {matchDetail.jugadores.map((j) => (
-                          <li key={j.id} className="text-gray-300 text-sm">
-                            {j.nombre} {j.posicion && <span className="text-gray-500">({j.posicion})</span>}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )
                 )}
 
                 {/* Resultado si ya está cargado */}

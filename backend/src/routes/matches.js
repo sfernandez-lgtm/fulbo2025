@@ -80,12 +80,13 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Partido no encontrado' });
     }
 
-    // Obtener jugadores anotados
+    // Obtener jugadores anotados con estado de pago
     const jugadoresResult = await db.query(
-      `SELECT u.id, u.nombre, u.posicion
+      `SELECT u.id, u.nombre, u.posicion, u.ranking, pj.equipo, pj.pago_confirmado
        FROM partido_jugadores pj
        JOIN usuarios u ON pj.jugador_id = u.id
-       WHERE pj.partido_id = $1`,
+       WHERE pj.partido_id = $1
+       ORDER BY pj.created_at ASC`,
       [req.params.id]
     );
 
@@ -610,6 +611,95 @@ router.post('/:id/assign-teams', authMiddleware, isDueno, async (req, res) => {
   } catch (error) {
     console.error('Error asignando equipos:', error);
     res.status(500).json({ error: 'Error al asignar equipos' });
+  }
+});
+
+// PUT /api/matches/:matchId/players/:playerId/confirm-payment - Confirmar pago de jugador
+router.put('/:matchId/players/:playerId/confirm-payment', authMiddleware, isDueno, async (req, res) => {
+  try {
+    const { matchId, playerId } = req.params;
+
+    // Verificar que el partido existe y pertenece al organizador
+    const partido = await db.query(
+      'SELECT id, organizador_id FROM partidos WHERE id = $1',
+      [matchId]
+    );
+
+    if (partido.rows.length === 0) {
+      return res.status(404).json({ error: 'Partido no encontrado' });
+    }
+
+    if (partido.rows[0].organizador_id !== req.user.id) {
+      return res.status(403).json({ error: 'No tenés permiso para modificar este partido' });
+    }
+
+    // Verificar que el jugador está anotado en el partido
+    const inscripcion = await db.query(
+      'SELECT id FROM partido_jugadores WHERE partido_id = $1 AND jugador_id = $2',
+      [matchId, playerId]
+    );
+
+    if (inscripcion.rows.length === 0) {
+      return res.status(404).json({ error: 'El jugador no está anotado en este partido' });
+    }
+
+    // Confirmar pago
+    await db.query(
+      'UPDATE partido_jugadores SET pago_confirmado = true WHERE partido_id = $1 AND jugador_id = $2',
+      [matchId, playerId]
+    );
+
+    res.json({ message: 'Pago confirmado exitosamente' });
+  } catch (error) {
+    console.error('Error confirmando pago:', error);
+    res.status(500).json({ error: 'Error al confirmar pago' });
+  }
+});
+
+// PUT /api/matches/:matchId/players/:playerId/block - Bloquear jugador por no pagar
+router.put('/:matchId/players/:playerId/block', authMiddleware, isDueno, async (req, res) => {
+  try {
+    const { matchId, playerId } = req.params;
+
+    // Verificar que el partido existe y pertenece al organizador
+    const partido = await db.query(
+      'SELECT id, organizador_id FROM partidos WHERE id = $1',
+      [matchId]
+    );
+
+    if (partido.rows.length === 0) {
+      return res.status(404).json({ error: 'Partido no encontrado' });
+    }
+
+    if (partido.rows[0].organizador_id !== req.user.id) {
+      return res.status(403).json({ error: 'No tenés permiso para modificar este partido' });
+    }
+
+    // Verificar que el jugador está anotado en el partido
+    const inscripcion = await db.query(
+      'SELECT id FROM partido_jugadores WHERE partido_id = $1 AND jugador_id = $2',
+      [matchId, playerId]
+    );
+
+    if (inscripcion.rows.length === 0) {
+      return res.status(404).json({ error: 'El jugador no está anotado en este partido' });
+    }
+
+    // Bloquear cuenta del jugador
+    await db.query(
+      'UPDATE usuarios SET cuenta_bloqueada = true WHERE id = $1',
+      [playerId]
+    );
+
+    // Obtener nombre del jugador para el mensaje
+    const jugador = await db.query('SELECT nombre FROM usuarios WHERE id = $1', [playerId]);
+
+    res.json({
+      message: `Cuenta de ${jugador.rows[0]?.nombre || 'jugador'} bloqueada por falta de pago`
+    });
+  } catch (error) {
+    console.error('Error bloqueando jugador:', error);
+    res.status(500).json({ error: 'Error al bloquear jugador' });
   }
 });
 

@@ -28,3 +28,15 @@ export const leaveMatch = async (id: string | number) => {
   const response = await api.delete(`/matches/${id}/leave`);
   return response.data;
 };
+
+// Confirmar pago de un jugador (solo dueños)
+export const confirmPayment = async (matchId: string | number, playerId: string | number) => {
+  const response = await api.put(`/matches/${matchId}/players/${playerId}/confirm-payment`);
+  return response.data;
+};
+
+// Bloquear jugador por no pagar (solo dueños)
+export const blockPlayer = async (matchId: string | number, playerId: string | number) => {
+  const response = await api.put(`/matches/${matchId}/players/${playerId}/block`);
+  return response.data;
+};
