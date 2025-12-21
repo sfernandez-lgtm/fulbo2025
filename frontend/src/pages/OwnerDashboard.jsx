@@ -5,6 +5,7 @@ import { getCurrentUser, logout } from '../services/auth';
 import { validateWithAI } from '../services/ai';
 import { createSubscription } from '../services/payments';
 import { confirmPayment, blockPlayer } from '../services/matches';
+import { getOwnerStats, getMonthlyStats } from '../services/owners';
 
 function OwnerDashboard() {
   const navigate = useNavigate();
@@ -61,12 +62,34 @@ function OwnerDashboard() {
   const [confirmingPayment, setConfirmingPayment] = useState(null);
   const [blockingPlayer, setBlockingPlayer] = useState(null);
 
+  // Stats states
+  const [stats, setStats] = useState(null);
+  const [monthlyStats, setMonthlyStats] = useState([]);
+  const [loadingStats, setLoadingStats] = useState(true);
+
   useEffect(() => {
     const currentUser = getCurrentUser();
     setUser(currentUser);
     fetchData();
     fetchSubscriptionStatus();
+    fetchStats();
   }, []);
+
+  const fetchStats = async () => {
+    try {
+      setLoadingStats(true);
+      const [statsData, monthlyData] = await Promise.all([
+        getOwnerStats(),
+        getMonthlyStats()
+      ]);
+      setStats(statsData);
+      setMonthlyStats(monthlyData);
+    } catch (err) {
+      console.error('Error cargando stats:', err);
+    } finally {
+      setLoadingStats(false);
+    }
+  };
 
   const fetchSubscriptionStatus = async () => {
     try {
@@ -439,6 +462,82 @@ function OwnerDashboard() {
               </div>
             </div>
           )
+        )}
+
+        {/* Stats Section - Solo si tiene pagos confirmados */}
+        {!loadingStats && stats && stats.jugadores_pagaron > 0 && (
+          <div className="bg-gray-800 rounded-xl p-6 mb-6">
+            <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <span>📊</span> Estadísticas
+            </h2>
+
+            {/* Cards de stats */}
+            <div className="grid grid-cols-2 gap-3 mb-6">
+              <div className="bg-green-500/20 border border-green-500/50 rounded-lg p-4">
+                <p className="text-green-400/70 text-xs mb-1">💰 Total Recaudado</p>
+                <p className="text-green-400 text-xl font-bold">
+                  ${stats.total_recaudado.toLocaleString()}
+                </p>
+              </div>
+              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
+                <p className="text-green-400/70 text-xs mb-1">📅 Este Mes</p>
+                <p className="text-green-300 text-xl font-bold">
+                  ${stats.recaudado_mes.toLocaleString()}
+                </p>
+              </div>
+              <div className="bg-gray-700/50 rounded-lg p-4">
+                <p className="text-gray-400 text-xs mb-1">⚽ Partidos</p>
+                <p className="text-white text-xl font-bold">
+                  {stats.partidos_total}
+                  {stats.partidos_mes > 0 && (
+                    <span className="text-sm text-gray-400 font-normal ml-1">
+                      ({stats.partidos_mes} este mes)
+                    </span>
+                  )}
+                </p>
+              </div>
+              <div className="bg-gray-700/50 rounded-lg p-4">
+                <p className="text-gray-400 text-xs mb-1">👥 Jugadores únicos</p>
+                <p className="text-white text-xl font-bold">{stats.jugadores_unicos}</p>
+              </div>
+            </div>
+
+            {/* Mini gráfico de barras */}
+            {monthlyStats.length > 0 && (
+              <div>
+                <p className="text-gray-400 text-sm mb-3">Ingresos últimos 6 meses</p>
+                <div className="flex items-end justify-between gap-2 h-24">
+                  {monthlyStats.map((month, index) => {
+                    const maxIngresos = Math.max(...monthlyStats.map(m => m.ingresos), 1);
+                    const height = month.ingresos > 0 ? Math.max((month.ingresos / maxIngresos) * 100, 8) : 4;
+                    return (
+                      <div key={index} className="flex-1 flex flex-col items-center">
+                        <div
+                          className={`w-full rounded-t transition-all ${month.ingresos > 0 ? 'bg-green-500' : 'bg-gray-600'}`}
+                          style={{ height: `${height}%` }}
+                          title={`$${month.ingresos.toLocaleString()}`}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">{month.mes}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Partido top */}
+            {stats.partido_top && (
+              <div className="mt-4 pt-4 border-t border-gray-700">
+                <p className="text-gray-400 text-xs mb-1">🏆 Mejor partido</p>
+                <p className="text-white font-medium">
+                  {stats.partido_top.cancha_nombre || stats.partido_top.nombre}
+                  <span className="text-green-400 ml-2">
+                    ${stats.partido_top.recaudacion?.toLocaleString()}
+                  </span>
+                </p>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Loading */}
