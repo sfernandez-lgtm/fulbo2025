@@ -6,6 +6,7 @@ import MatchDetail from './pages/MatchDetail'
 import PlayerProfile from './pages/PlayerProfile'
 import OwnerDashboard from './pages/OwnerDashboard'
 import Rankings from './pages/Rankings'
+import Friends from './pages/Friends'
 
 function App() {
   return (
@@ -19,6 +20,8 @@ function App() {
         <Route path="/player/profile" element={<PlayerProfile />} />
         <Route path="/owner" element={<OwnerDashboard />} />
         <Route path="/rankings" element={<Rankings />} />
+        <Route path="/amigos" element={<Friends />} />
+        <Route path="/player/profile/:id" element={<PlayerProfile />} />
       </Routes>
     </BrowserRouter>
   )
