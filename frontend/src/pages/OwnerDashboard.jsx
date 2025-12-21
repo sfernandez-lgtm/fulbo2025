@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { getMyVenues, createVenue, createMatch, getMyMatches, setMatchResult, getMatchDetail, assignTeams } from '../services/venues';
 import { getCurrentUser, logout } from '../services/auth';
 import { validateWithAI } from '../services/ai';
+import { createSubscription } from '../services/payments';
 
 function OwnerDashboard() {
   const navigate = useNavigate();
@@ -50,11 +51,54 @@ function OwnerDashboard() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [validating, setValidating] = useState(false);
 
+  // Subscription states
+  const [suscripcionActiva, setSuscripcionActiva] = useState(false);
+  const [suscripcionVence, setSuscripcionVence] = useState(null);
+  const [activandoSuscripcion, setActivandoSuscripcion] = useState(false);
+
   useEffect(() => {
     const currentUser = getCurrentUser();
     setUser(currentUser);
     fetchData();
+    fetchSubscriptionStatus();
   }, []);
+
+  const fetchSubscriptionStatus = async () => {
+    try {
+      const response = await fetch('http://localhost:3000/api/payments/status/check', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setSuscripcionActiva(data.suscripcion_activa);
+        setSuscripcionVence(data.suscripcion_vence);
+      }
+    } catch (err) {
+      console.error('Error obteniendo estado de suscripción:', err);
+    }
+  };
+
+  const handleActivarSuscripcion = async () => {
+    setActivandoSuscripcion(true);
+    setError('');
+
+    try {
+      const result = await createSubscription('dueno');
+      // Redirigir a MercadoPago
+      window.location.href = result.sandbox_init_point || result.init_point;
+    } catch (err) {
+      setError(err.response?.data?.error || 'Error al crear suscripción');
+      setActivandoSuscripcion(false);
+    }
+  };
+
+  const formatSubscriptionDate = (fecha) => {
+    if (!fecha) return '';
+    const date = new Date(fecha);
+    return date.toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' });
+  };
 
   const fetchData = async () => {
     try {
@@ -295,6 +339,40 @@ function OwnerDashboard() {
           <div className="bg-green-500/20 border border-green-500 text-green-400 px-4 py-3 rounded mb-4">
             {success}
           </div>
+        )}
+
+        {/* Subscription Banner */}
+        {!loading && (
+          suscripcionActiva && suscripcionVence ? (
+            <div className="bg-green-500/20 border border-green-500 rounded-xl p-4 mb-6 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">✓</span>
+                <div>
+                  <p className="text-green-400 font-semibold">Suscripción activa</p>
+                  <p className="text-green-400/70 text-sm">Vence el {formatSubscriptionDate(suscripcionVence)}</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-yellow-500/20 border border-yellow-500 rounded-xl p-4 mb-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">⚠️</span>
+                  <div>
+                    <p className="text-yellow-400 font-semibold">Tu suscripción está inactiva</p>
+                    <p className="text-yellow-400/70 text-sm">No podés crear partidos hasta activarla</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleActivarSuscripcion}
+                  disabled={activandoSuscripcion}
+                  className="bg-yellow-500 hover:bg-yellow-600 disabled:bg-yellow-800 text-black font-semibold px-4 py-2 rounded-lg transition whitespace-nowrap"
+                >
+                  {activandoSuscripcion ? 'Procesando...' : 'Activar ($10.000/mes)'}
+                </button>
+              </div>
+            </div>
+          )
         )}
 
         {/* Loading */}

@@ -105,6 +105,50 @@ router.post('/:id/join', authMiddleware, isJugador, async (req, res) => {
     const partidoId = req.params.id;
     const jugadorId = req.user.id;
 
+    // Obtener datos del jugador para verificar restricciones
+    const jugador = await db.query(
+      `SELECT plan, partidos_mes_actual, mes_actual, suscripcion_vence, cuenta_bloqueada
+       FROM usuarios WHERE id = $1`,
+      [jugadorId]
+    );
+
+    const j = jugador.rows[0];
+
+    // Verificar cuenta bloqueada
+    if (j.cuenta_bloqueada) {
+      return res.status(403).json({ error: 'Tu cuenta está bloqueada por falta de pago' });
+    }
+
+    // Determinar plan efectivo (si premium venció, tratarlo como free)
+    const mesActual = new Date().getMonth() + 1; // 1-12
+    let planEfectivo = j.plan || 'free';
+
+    if (planEfectivo === 'premium') {
+      const suscripcionVigente = j.suscripcion_vence && new Date(j.suscripcion_vence) > new Date();
+      if (!suscripcionVigente) {
+        planEfectivo = 'free'; // Premium vencido, tratarlo como free
+      }
+    }
+
+    // Restricciones para plan free
+    let partidosMesActual = j.partidos_mes_actual || 0;
+
+    if (planEfectivo === 'free') {
+      // Si cambió el mes, resetear contador
+      if (j.mes_actual !== mesActual) {
+        partidosMesActual = 0;
+        await db.query(
+          'UPDATE usuarios SET mes_actual = $1, partidos_mes_actual = 0 WHERE id = $2',
+          [mesActual, jugadorId]
+        );
+      }
+
+      // Verificar límite de 2 partidos
+      if (partidosMesActual >= 2) {
+        return res.status(403).json({ error: 'Alcanzaste el límite de 2 partidos gratis. Pasate a premium.' });
+      }
+    }
+
     // Verificar que el partido existe y tiene cupo
     const partido = await db.query(
       `SELECT p.*,
@@ -136,6 +180,14 @@ router.post('/:id/join', authMiddleware, isJugador, async (req, res) => {
       'INSERT INTO partido_jugadores (partido_id, jugador_id, created_at) VALUES ($1, $2, NOW())',
       [partidoId, jugadorId]
     );
+
+    // Incrementar contador para plan free
+    if (planEfectivo === 'free') {
+      await db.query(
+        'UPDATE usuarios SET partidos_mes_actual = partidos_mes_actual + 1, mes_actual = $1 WHERE id = $2',
+        [mesActual, jugadorId]
+      );
+    }
 
     res.json({ message: 'Te anotaste al partido exitosamente' });
   } catch (error) {
@@ -249,6 +301,20 @@ router.delete('/:id/leave', authMiddleware, isJugador, async (req, res) => {
 router.post('/', authMiddleware, isDueno, async (req, res) => {
   try {
     const { cancha_id, fecha, hora_inicio, hora_fin, max_jugadores, precio_por_jugador, descripcion } = req.body;
+
+    // Verificar suscripción del dueño
+    const dueno = await db.query(
+      'SELECT suscripcion_activa, suscripcion_vence FROM usuarios WHERE id = $1',
+      [req.user.id]
+    );
+
+    const suscripcionActiva = dueno.rows[0]?.suscripcion_activa;
+    const suscripcionVence = dueno.rows[0]?.suscripcion_vence;
+    const suscripcionVigente = suscripcionVence && new Date(suscripcionVence) > new Date();
+
+    if (!suscripcionActiva || !suscripcionVigente) {
+      return res.status(403).json({ error: 'Tu suscripción está inactiva o vencida' });
+    }
 
     // Verificar que la cancha pertenece al dueño
     const cancha = await db.query(
