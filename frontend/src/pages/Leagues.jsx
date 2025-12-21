@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getMyLeague, getLeagueStandings, getTopDiamond } from '../services/leagues';
 import { getCurrentUser } from '../services/auth';
+import PageWithAds from '../components/PageWithAds';
 
 function Leagues() {
   const [myLeague, setMyLeague] = useState(null);
@@ -81,10 +82,11 @@ function Leagues() {
         <span className="text-xl">Ligas</span>
       </header>
 
-      <main className="p-6 max-w-2xl mx-auto">
-        <Link to="/player" className="inline-flex items-center text-gray-400 hover:text-white mb-4">
-          ← Volver
-        </Link>
+      <PageWithAds>
+        <main className="p-6">
+          <Link to="/player" className="inline-flex items-center text-gray-400 hover:text-white mb-4">
+            ← Volver
+          </Link>
 
         {/* Error */}
         {error && (
@@ -293,7 +295,8 @@ function Leagues() {
             })}
           </div>
         </div>
-      </main>
+        </main>
+      </PageWithAds>
     </div>
   );
 }

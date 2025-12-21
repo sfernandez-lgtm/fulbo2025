@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { getMatches } from '../services/matches';
 import { getZones } from '../services/venues';
 import { createSubscription, getSubscriptionStatus } from '../services/payments';
+import PageWithAds from '../components/PageWithAds';
 
 function PlayerHome() {
   const [matches, setMatches] = useState([]);
@@ -219,11 +220,12 @@ function PlayerHome() {
         </div>
       </header>
 
-      <main className="p-6 max-w-2xl mx-auto">
-        {/* Banner de suscripción */}
-        {renderSubscriptionBanner()}
+      <PageWithAds>
+        <main className="p-6">
+          {/* Banner de suscripción */}
+          {renderSubscriptionBanner()}
 
-        <h1 className="text-2xl font-bold text-white mb-6">Partidos Disponibles</h1>
+          <h1 className="text-2xl font-bold text-white mb-6">Partidos Disponibles</h1>
 
         {/* Filtros */}
         <div className="bg-gray-800 rounded-xl p-4 mb-6">
@@ -343,7 +345,8 @@ function PlayerHome() {
             ))}
           </div>
         )}
-      </main>
+        </main>
+      </PageWithAds>
     </div>
   );
 }

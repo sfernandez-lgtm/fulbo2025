@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getRankings, getMyRanking } from '../services/rankings';
 import { getCurrentUser } from '../services/auth';
+import PageWithAds from '../components/PageWithAds';
 
 function Rankings() {
   const [rankings, setRankings] = useState([]);
@@ -78,7 +79,8 @@ function Rankings() {
         </div>
       </header>
 
-      <main className="p-6 max-w-2xl mx-auto">
+      <PageWithAds>
+        <main className="p-6">
         {/* Título decorativo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-3 bg-sky-500/20 border border-sky-400 rounded-full px-6 py-3">
@@ -222,7 +224,8 @@ function Rankings() {
             <p className="mt-1">El ranking se actualiza después de cada partido</p>
           </div>
         )}
-      </main>
+        </main>
+      </PageWithAds>
 
       {/* Footer decorativo */}
       <footer className="mt-8 py-4 bg-gradient-to-r from-sky-400 via-white to-sky-400">
