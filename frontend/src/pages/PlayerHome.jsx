@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getMatches } from '../services/matches';
 import { getZones } from '../services/venues';
+import { createSubscription, getSubscriptionStatus } from '../services/payments';
 
 function PlayerHome() {
   const [matches, setMatches] = useState([]);
@@ -12,6 +13,14 @@ function PlayerHome() {
   const [zonaFilter, setZonaFilter] = useState('');
   const [fechaFilter, setFechaFilter] = useState('');
   const [zonas, setZonas] = useState([]);
+
+  // Estados para suscripción
+  const [plan, setPlan] = useState('free');
+  const [partidosMesActual, setPartidosMesActual] = useState(0);
+  const [cuentaBloqueada, setCuentaBloqueada] = useState(false);
+  const [suscripcionVence, setSuscripcionVence] = useState(null);
+  const [suscripcionActiva, setSuscripcionActiva] = useState(false);
+  const [activandoPremium, setActivandoPremium] = useState(false);
 
   // Opciones de fecha - próximos 7 días
   const getDateOptions = () => {
@@ -71,6 +80,23 @@ function PlayerHome() {
     fetchZones();
   }, []);
 
+  // Cargar estado de suscripción
+  useEffect(() => {
+    const fetchSubscriptionStatus = async () => {
+      try {
+        const status = await getSubscriptionStatus();
+        setPlan(status.plan || 'free');
+        setPartidosMesActual(status.partidos_mes_actual || 0);
+        setCuentaBloqueada(status.cuenta_bloqueada || false);
+        setSuscripcionVence(status.suscripcion_vence);
+        setSuscripcionActiva(status.suscripcion_activa || false);
+      } catch (err) {
+        console.error('Error cargando estado de suscripción:', err);
+      }
+    };
+    fetchSubscriptionStatus();
+  }, []);
+
   useEffect(() => {
     fetchMatches();
   }, [zonaFilter, fechaFilter]);
@@ -90,6 +116,97 @@ function PlayerHome() {
 
   const hasActiveFilters = zonaFilter || fechaFilter;
 
+  // Formatear fecha de suscripción
+  const formatSubscriptionDate = (fecha) => {
+    if (!fecha) return '';
+    return new Date(fecha).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' });
+  };
+
+  // Handler para activar premium
+  const handleActivarPremium = async () => {
+    try {
+      setActivandoPremium(true);
+      const result = await createSubscription('premium');
+      if (result.sandbox_init_point) {
+        window.location.href = result.sandbox_init_point;
+      } else if (result.init_point) {
+        window.location.href = result.init_point;
+      }
+    } catch (err) {
+      console.error('Error activando premium:', err);
+      alert('Error al procesar el pago. Intentá de nuevo.');
+    } finally {
+      setActivandoPremium(false);
+    }
+  };
+
+  // Renderizar banner de suscripción
+  const renderSubscriptionBanner = () => {
+    // Cuenta bloqueada
+    if (cuentaBloqueada) {
+      return (
+        <div className="bg-red-500/20 border border-red-500 rounded-xl p-4 mb-6">
+          <p className="text-red-400 font-semibold">Cuenta bloqueada por falta de pago</p>
+          <p className="text-red-400/70 text-sm">Contactá al organizador para regularizar tu situación</p>
+        </div>
+      );
+    }
+
+    // Plan premium activo
+    if (plan === 'premium' && suscripcionActiva) {
+      return (
+        <div className="bg-green-500/20 border border-green-500 rounded-xl p-4 mb-6">
+          <p className="text-green-400 font-semibold">Plan Premium - Partidos ilimitados</p>
+          <p className="text-green-400/70 text-sm">Válido hasta el {formatSubscriptionDate(suscripcionVence)}</p>
+        </div>
+      );
+    }
+
+    // Plan free - límite alcanzado
+    if (plan === 'free' && partidosMesActual >= 2) {
+      return (
+        <div className="bg-red-500/20 border border-red-500 rounded-xl p-4 mb-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-red-400 font-semibold">Alcanzaste tu límite mensual</p>
+              <p className="text-red-400/70 text-sm">Usaste {partidosMesActual}/2 partidos gratis este mes</p>
+            </div>
+            <button
+              onClick={handleActivarPremium}
+              disabled={activandoPremium}
+              className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold px-4 py-2 rounded-lg text-sm disabled:opacity-50"
+            >
+              {activandoPremium ? 'Procesando...' : 'Premium ($4.000/mes)'}
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // Plan free - con partidos disponibles
+    if (plan === 'free') {
+      return (
+        <div className="bg-sky-500/20 border border-sky-500 rounded-xl p-4 mb-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-sky-400 font-semibold">Plan Gratis</p>
+              <p className="text-sky-400/70 text-sm">Te quedan {2 - partidosMesActual}/2 partidos este mes</p>
+            </div>
+            <button
+              onClick={handleActivarPremium}
+              disabled={activandoPremium}
+              className="bg-sky-500 hover:bg-sky-600 text-white font-bold px-4 py-2 rounded-lg text-sm disabled:opacity-50"
+            >
+              {activandoPremium ? 'Procesando...' : 'Pasate a Premium ($4.000/mes)'}
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
   return (
     <div className="min-h-screen bg-gray-900">
       <header className="bg-gray-800 shadow-sm px-6 py-4 flex justify-between items-center">
@@ -98,6 +215,9 @@ function PlayerHome() {
       </header>
 
       <main className="p-6 max-w-2xl mx-auto">
+        {/* Banner de suscripción */}
+        {renderSubscriptionBanner()}
+
         <h1 className="text-2xl font-bold text-white mb-6">Partidos Disponibles</h1>
 
         {/* Filtros */}

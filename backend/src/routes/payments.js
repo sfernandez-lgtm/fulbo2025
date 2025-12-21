@@ -151,9 +151,10 @@ router.get('/status/check', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // Obtener estado de suscripción del usuario
+    // Obtener estado de suscripción del usuario (incluye campos de jugador)
     const user = await db.query(
-      `SELECT tipo, suscripcion_activa, suscripcion_vence, plan, suscripcion_id_mp
+      `SELECT tipo, suscripcion_activa, suscripcion_vence, plan, suscripcion_id_mp,
+              partidos_mes_actual, mes_actual, cuenta_bloqueada
        FROM usuarios WHERE id = $1`,
       [userId]
     );
@@ -167,12 +168,21 @@ router.get('/status/check', authMiddleware, async (req, res) => {
     // Verificar si la suscripción está vigente
     const suscripcionVigente = u.suscripcion_vence && new Date(u.suscripcion_vence) > new Date();
 
+    // Resetear contador si cambió el mes
+    const mesActual = new Date().getMonth() + 1;
+    let partidosMesActual = u.partidos_mes_actual || 0;
+    if (u.mes_actual !== mesActual) {
+      partidosMesActual = 0;
+    }
+
     res.json({
       suscripcion_activa: u.suscripcion_activa && suscripcionVigente,
       suscripcion_vence: u.suscripcion_vence,
-      plan: u.plan,
+      plan: u.plan || 'free',
       tipo: u.tipo,
-      tiene_suscripcion: u.suscripcion_id_mp !== null
+      tiene_suscripcion: u.suscripcion_id_mp !== null,
+      partidos_mes_actual: partidosMesActual,
+      cuenta_bloqueada: u.cuenta_bloqueada || false
     });
   } catch (error) {
     console.error('Error verificando estado:', error);
