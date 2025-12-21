@@ -211,7 +211,10 @@ function PlayerHome() {
     <div className="min-h-screen bg-gray-900">
       <header className="bg-gray-800 shadow-sm px-6 py-4 flex justify-between items-center">
         <Link to="/player" className="text-2xl font-bold text-sky-400">Fulvo</Link>
-        <Link to="/player/profile" className="text-2xl">👤</Link>
+        <div className="flex items-center gap-4">
+          <Link to="/rankings" className="text-2xl hover:scale-110 transition" title="Ranking">🏆</Link>
+          <Link to="/player/profile" className="text-2xl hover:scale-110 transition" title="Perfil">👤</Link>
+        </div>
       </header>
 
       <main className="p-6 max-w-2xl mx-auto">
