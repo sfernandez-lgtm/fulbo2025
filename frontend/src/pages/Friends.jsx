@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getFriends, getPendingRequests, acceptFriendRequest, removeFriend, searchPlayers, sendFriendRequest } from '../services/friends';
+import { getPositionData } from '../utils/positions';
 
 function Friends() {
   const [activeTab, setActiveTab] = useState('amigos');
@@ -134,7 +135,7 @@ function Friends() {
   return (
     <div className="min-h-screen bg-gray-900">
       <header className="bg-gray-800 shadow-sm px-6 py-4 flex justify-between items-center">
-        <Link to="/player" className="text-2xl font-bold text-sky-400">Fulvo</Link>
+        <Link to="/player"><img src="/images/logo-fulvo.png" alt="Fulvo" className="h-10" /></Link>
         <h1 className="text-lg font-semibold text-white">Amigos</h1>
         <Link to="/player" className="text-gray-400 hover:text-white">Volver</Link>
       </header>
@@ -224,8 +225,13 @@ function Friends() {
                       </div>
                       <div>
                         <p className="text-white font-semibold">{friend.nombre}</p>
-                        <p className="text-gray-400 text-sm">
-                          {friend.posicion || 'Sin posición'} · Ranking: {friend.ranking || 50}
+                        <p className="text-gray-400 text-sm flex items-center gap-1">
+                          {(() => {
+                            const posData = getPositionData(friend.posicion);
+                            return posData ? (
+                              <span className={posData.color.split(' ')[1]}>{posData.icon} {posData.label}</span>
+                            ) : 'Sin posición';
+                          })()} · Ranking: {friend.ranking || 50}
                         </p>
                       </div>
                     </div>
@@ -265,8 +271,13 @@ function Friends() {
                       </div>
                       <div>
                         <p className="text-white font-semibold">{request.nombre}</p>
-                        <p className="text-gray-400 text-sm">
-                          {request.posicion || 'Sin posición'} · Ranking: {request.ranking || 50}
+                        <p className="text-gray-400 text-sm flex items-center gap-1">
+                          {(() => {
+                            const posData = getPositionData(request.posicion);
+                            return posData ? (
+                              <span className={posData.color.split(' ')[1]}>{posData.icon} {posData.label}</span>
+                            ) : 'Sin posición';
+                          })()} · Ranking: {request.ranking || 50}
                         </p>
                       </div>
                     </div>
@@ -339,8 +350,13 @@ function Friends() {
                       </div>
                       <div>
                         <p className="text-white font-medium">{player.nombre}</p>
-                        <p className="text-gray-400 text-xs">
-                          {player.posicion || 'Sin posición'} · Ranking: {player.ranking || 50}
+                        <p className="text-gray-400 text-xs flex items-center gap-1">
+                          {(() => {
+                            const posData = getPositionData(player.posicion);
+                            return posData ? (
+                              <span className={posData.color.split(' ')[1]}>{posData.icon} {posData.label}</span>
+                            ) : 'Sin posición';
+                          })()} · Ranking: {player.ranking || 50}
                         </p>
                       </div>
                     </div>

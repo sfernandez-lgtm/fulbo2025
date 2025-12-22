@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getMyProfile, getMyMatches, getPlayerById } from '../services/players';
 import { getFriendshipStatus, sendFriendRequest, removeFriend, acceptFriendRequest } from '../services/friends';
 import { logout, getCurrentUser } from '../services/auth';
+import { getPositionData } from '../utils/positions';
 
 function PlayerProfile() {
   const navigate = useNavigate();
@@ -158,7 +159,7 @@ function PlayerProfile() {
   return (
     <div className="min-h-screen bg-gray-900">
       <header className="bg-gray-800 shadow-sm px-6 py-4 flex justify-between items-center">
-        <Link to="/player" className="text-2xl font-bold text-sky-400">Fulvo</Link>
+        <Link to="/player"><img src="/images/logo-fulvo.png" alt="Fulvo" className="h-10" /></Link>
         <span className="text-2xl bg-sky-500 rounded-full w-10 h-10 flex items-center justify-center">👤</span>
       </header>
 
@@ -184,11 +185,15 @@ function PlayerProfile() {
           <div className="text-6xl mb-4">⚽</div>
           <h1 className="text-2xl font-bold text-white mb-1">{profile?.nombre}</h1>
           {isMyProfile && <p className="text-gray-400 mb-3">{profile?.email}</p>}
-          {profile?.posicion && (
-            <span className="inline-block bg-sky-500 text-white text-sm font-semibold px-4 py-1 rounded-full mb-4">
-              {profile.posicion}
-            </span>
-          )}
+          {profile?.posicion && (() => {
+            const posData = getPositionData(profile.posicion);
+            return posData && (
+              <span className={`inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-full mb-4 border ${posData.color}`}>
+                <span className="text-lg">{posData.icon}</span>
+                <span>{posData.label}</span>
+              </span>
+            );
+          })()}
 
           {/* Botón de amistad (solo si estoy viendo otro perfil) */}
           {!isMyProfile && currentUser && (

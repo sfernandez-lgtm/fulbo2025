@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { getRankings, getMyRanking } from '../services/rankings';
 import { getCurrentUser } from '../services/auth';
 import PageWithAds from '../components/PageWithAds';
+import { getPositionData } from '../utils/positions';
 
 function Rankings() {
   const [rankings, setRankings] = useState([]);
@@ -64,8 +65,8 @@ function Rankings() {
       {/* Header con colores Argentina */}
       <header className="bg-gradient-to-r from-sky-400 via-white to-sky-400 shadow-lg px-6 py-4">
         <div className="max-w-2xl mx-auto flex justify-between items-center">
-          <Link to={currentUser?.tipo === 'jugador' ? '/player' : '/'} className="text-2xl font-bold text-sky-900">
-            Fulvo
+          <Link to={currentUser?.tipo === 'jugador' ? '/player' : '/'}>
+            <img src="/images/logo-fulvo.png" alt="Fulvo" className="h-10" />
           </Link>
           <h1 className="text-xl font-bold text-sky-900 flex items-center gap-2">
             Ranking Global
@@ -117,7 +118,16 @@ function Rankings() {
                   </span>
                   <div>
                     <p className="text-white font-semibold">{myRanking.nombre}</p>
-                    <p className="text-gray-400 text-sm">{myRanking.posicion || 'Sin posición'}</p>
+                    {(() => {
+                      const posData = getPositionData(myRanking.posicion);
+                      return posData ? (
+                        <span className={`inline-flex items-center gap-1 text-xs ${posData.color.split(' ')[1]}`}>
+                          <span>{posData.icon}</span> {posData.label}
+                        </span>
+                      ) : (
+                        <p className="text-gray-400 text-sm">Sin posición</p>
+                      );
+                    })()}
                   </div>
                 </div>
                 <div className="text-right">
@@ -172,7 +182,16 @@ function Rankings() {
                       {player.nombre}
                       {isCurrentUser && <span className="ml-2 text-xs">(Vos)</span>}
                     </p>
-                    <p className="text-gray-400 text-xs">{player.posicion || 'Sin posición'}</p>
+                    {(() => {
+                      const posData = getPositionData(player.posicion);
+                      return posData ? (
+                        <span className={`inline-flex items-center gap-1 text-xs ${posData.color.split(' ')[1]}`}>
+                          <span>{posData.icon}</span> {posData.label}
+                        </span>
+                      ) : (
+                        <p className="text-gray-400 text-xs">Sin posición</p>
+                      );
+                    })()}
                   </div>
 
                   {/* Ranking */}

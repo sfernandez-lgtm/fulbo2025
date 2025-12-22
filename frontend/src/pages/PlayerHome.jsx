@@ -117,6 +117,13 @@ function PlayerHome() {
 
   const hasActiveFilters = zonaFilter || fechaFilter;
 
+  // Determinar si es de día o noche según la hora
+  const isDayTime = (horaInicio) => {
+    if (!horaInicio) return true;
+    const hora = parseInt(horaInicio.split(':')[0], 10);
+    return hora < 18;
+  };
+
   // Formatear fecha de suscripción
   const formatSubscriptionDate = (fecha) => {
     if (!fecha) return '';
@@ -187,16 +194,23 @@ function PlayerHome() {
     // Plan free - con partidos disponibles
     if (plan === 'free') {
       return (
-        <div className="bg-sky-500/20 border border-sky-500 rounded-xl p-4 mb-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <p className="text-sky-400 font-semibold">Plan Gratis</p>
-              <p className="text-sky-400/70 text-sm">Te quedan {2 - partidosMesActual}/2 partidos este mes</p>
-            </div>
+        <div className="relative rounded-xl overflow-hidden mb-6" style={{ minHeight: '150px' }}>
+          {/* Imagen de fondo */}
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: 'url(/images/campeones.png)' }}
+          />
+          {/* Overlay oscuro */}
+          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/60 to-black/40" />
+
+          {/* Contenido */}
+          <div className="relative z-10 p-6 flex flex-col justify-center h-full" style={{ minHeight: '150px' }}>
+            <p className="text-2xl font-bold text-yellow-400 mb-1">⭐⭐⭐ Jugá como un campeón</p>
+            <p className="text-gray-200 mb-4">Te quedan <span className="font-bold text-white">{2 - partidosMesActual}/2</span> partidos gratis este mes</p>
             <button
               onClick={handleActivarPremium}
               disabled={activandoPremium}
-              className="bg-sky-500 hover:bg-sky-600 text-white font-bold px-4 py-2 rounded-lg text-sm disabled:opacity-50"
+              className="w-fit bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-black font-bold px-6 py-3 rounded-lg disabled:opacity-50 shadow-lg transition-all hover:scale-105"
             >
               {activandoPremium ? 'Procesando...' : 'Pasate a Premium ($4.000/mes)'}
             </button>
@@ -209,9 +223,22 @@ function PlayerHome() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900">
-      <header className="bg-gray-800 shadow-sm px-6 py-4 flex justify-between items-center">
-        <Link to="/player" className="text-2xl font-bold text-sky-400">Fulvo</Link>
+    <div
+      className="min-h-screen relative"
+      style={{
+        backgroundImage: 'url(/images/background-arg.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed'
+      }}
+    >
+      {/* Overlay oscuro para legibilidad */}
+      <div className="absolute inset-0 bg-black/40 fixed" />
+
+      {/* Contenido */}
+      <div className="relative z-10">
+        <header className="bg-gray-800/90 backdrop-blur-sm shadow-sm px-6 py-4 flex justify-between items-center">
+        <Link to="/player"><img src="/images/logo-fulvo.png" alt="Fulvo" className="h-10" /></Link>
         <div className="flex items-center gap-4">
           <Link to="/ligas" className="text-2xl hover:scale-110 transition" title="Ligas">🏅</Link>
           <Link to="/rankings" className="text-2xl hover:scale-110 transition" title="Ranking">🏆</Link>
@@ -314,39 +341,78 @@ function PlayerHome() {
         {/* Matches list */}
         {!loading && !error && matches.length > 0 && (
           <div className="space-y-4">
-            {matches.map((match) => (
-              <div key={match.id} className="bg-gray-800 rounded-xl shadow-md p-5">
-                <div className="flex justify-between items-start mb-3">
-                  <h2 className="text-lg font-semibold text-white">{match.cancha_nombre}</h2>
-                  <span className="text-lg font-bold text-sky-400">
-                    ${match.precio_por_jugador || 0}
-                  </span>
-                </div>
+            {matches.map((match) => {
+              const cuposDisponibles = (match.max_jugadores || 14) - (match.jugadores_anotados || 0);
+              const estaLleno = cuposDisponibles <= 0;
+              const ultimosCupos = cuposDisponibles > 0 && cuposDisponibles <= 3;
 
-                <div className="space-y-2 text-gray-400 mb-4">
-                  <p className="flex items-center gap-2">
-                    <span>📅</span> {formatDate(match.fecha)}
-                  </p>
-                  <p className="flex items-center gap-2">
-                    <span>📍</span> {match.zona || match.direccion}
-                  </p>
-                  <p className="flex items-center gap-2">
-                    <span>👥</span> {match.jugadores_anotados || 0}/{match.max_jugadores || 14} jugadores
-                  </p>
-                </div>
-
-                <Link
-                  to={`/player/match/${match.id}`}
-                  className="block w-full text-center bg-sky-500 hover:bg-sky-600 text-white font-semibold py-2 rounded-lg transition"
+              return (
+                <div
+                  key={match.id}
+                  className="relative rounded-xl shadow-md overflow-hidden"
                 >
-                  Ver Partido
-                </Link>
-              </div>
-            ))}
+                  {/* Imagen de fondo día/noche */}
+                  <div
+                    className="absolute inset-0 bg-cover bg-center"
+                    style={{
+                      backgroundImage: `url(${isDayTime(match.hora_inicio) ? '/images/cancha-dia.png' : '/images/cancha-noche.png'})`
+                    }}
+                  />
+                  {/* Overlay oscuro */}
+                  <div className="absolute inset-0 bg-black/60" />
+
+                  {/* Badge de cupos */}
+                  {estaLleno && (
+                    <div className="absolute top-3 right-3 z-20 bg-gray-700 text-gray-300 text-xs font-bold px-3 py-1 rounded-full">
+                      COMPLETO
+                    </div>
+                  )}
+                  {ultimosCupos && (
+                    <div className="absolute top-3 right-3 z-20 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs font-bold px-3 py-1 rounded-full animate-pulse shadow-lg">
+                      🔥 {cuposDisponibles === 1 ? 'ÚLTIMO LUGAR' : `ÚLTIMOS ${cuposDisponibles} LUGARES`}
+                    </div>
+                  )}
+
+                  {/* Contenido */}
+                  <div className="relative z-10 p-5">
+                    <div className="flex justify-between items-start mb-3">
+                      <h2 className="text-lg font-semibold text-white">{match.cancha_nombre}</h2>
+                      <span className="text-lg font-bold text-sky-400 bg-black/40 px-2 py-1 rounded">
+                        ${match.precio_por_jugador || 0}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2 text-gray-200 mb-4">
+                      <p className="flex items-center gap-2">
+                        <span>📅</span> {formatDate(match.fecha)}
+                      </p>
+                      <p className="flex items-center gap-2">
+                        <span>📍</span> {match.zona || match.direccion}
+                      </p>
+                      <p className="flex items-center gap-2">
+                        <span>👥</span> {match.jugadores_anotados || 0}/{match.max_jugadores || 14} jugadores
+                      </p>
+                    </div>
+
+                    <Link
+                      to={`/player/match/${match.id}`}
+                      className={`block w-full text-center font-semibold py-2 rounded-lg transition ${
+                        estaLleno
+                          ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                          : 'bg-sky-500 hover:bg-sky-600 text-white'
+                      }`}
+                    >
+                      {estaLleno ? 'Partido Completo' : 'Ver Partido'}
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
         </main>
       </PageWithAds>
+      </div>
     </div>
   );
 }

@@ -35,7 +35,7 @@ function Login() {
       <div className="max-w-md w-full bg-gray-800 rounded-lg p-8">
         {/* Logo */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-sky-400">Fulvo</h1>
+          <img src="/images/logo-fulvo.png" alt="Fulvo" className="h-16 mx-auto" />
           <p className="text-gray-400 mt-2">Fútbol 7 en Argentina</p>
         </div>
 

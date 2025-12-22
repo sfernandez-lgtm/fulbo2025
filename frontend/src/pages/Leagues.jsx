@@ -78,7 +78,7 @@ function Leagues() {
   return (
     <div className="min-h-screen bg-gray-900">
       <header className="bg-gray-800 shadow-sm px-6 py-4 flex justify-between items-center">
-        <Link to="/player" className="text-2xl font-bold text-sky-400">Fulvo</Link>
+        <Link to="/player"><img src="/images/logo-fulvo.png" alt="Fulvo" className="h-10" /></Link>
         <span className="text-xl">Ligas</span>
       </header>
 

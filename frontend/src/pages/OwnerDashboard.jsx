@@ -6,6 +6,7 @@ import { validateWithAI } from '../services/ai';
 import { createSubscription } from '../services/payments';
 import { confirmPayment, blockPlayer } from '../services/matches';
 import { getOwnerStats, getMonthlyStats } from '../services/owners';
+import ChatWidget from '../components/ChatWidget';
 
 function OwnerDashboard() {
   const navigate = useNavigate();
@@ -413,7 +414,7 @@ function OwnerDashboard() {
   return (
     <div className="min-h-screen bg-gray-900">
       <header className="bg-gray-800 shadow-sm px-6 py-4 flex justify-between items-center">
-        <Link to="/owner" className="text-2xl font-bold text-sky-400">Fulvo</Link>
+        <Link to="/owner"><img src="/images/logo-fulvo.png" alt="Fulvo" className="h-10" /></Link>
         <span className="text-gray-400 font-medium">{user?.nombre || 'Mi Cuenta'}</span>
       </header>
 
@@ -1123,6 +1124,9 @@ function OwnerDashboard() {
           </div>
         </div>
       )}
+
+      {/* Chat Widget - Solo para dueños con suscripción activa */}
+      {suscripcionActiva && <ChatWidget />}
     </div>
   );
 }
