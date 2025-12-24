@@ -94,7 +94,8 @@ function OwnerDashboard() {
 
   const fetchSubscriptionStatus = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/payments/status/check', {
+      const apiUrl = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : 'http://localhost:3000/api';
+      const response = await fetch(`${apiUrl}/payments/status/check`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
