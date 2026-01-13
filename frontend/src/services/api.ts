@@ -1,7 +1,16 @@
 import axios from 'axios';
 
 // URL base del backend
-const API_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : 'http://localhost:3000/api';
+// VITE_API_URL debe ser la URL base sin /api (ej: https://fulbo-app-hl8hl.ondigitalocean.app)
+const getApiUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (!envUrl) return 'http://localhost:3000/api';
+
+  // Si ya termina en /api, usarla tal cual. Si no, agregar /api
+  return envUrl.endsWith('/api') ? envUrl : `${envUrl}/api`;
+};
+
+const API_URL = getApiUrl();
 
 // Crear instancia de axios
 const api = axios.create({
