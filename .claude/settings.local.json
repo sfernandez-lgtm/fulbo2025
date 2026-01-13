@@ -16,7 +16,12 @@
       "Bash(cmd //c \"rd /s /q C:\\Fulvo\\backend\")",
       "Bash(cmd //c \"rd /s /q C:\\Fulvo\\frontend\")",
       "Bash(powershell -Command \"Remove-Item -Path ''C:\\Fulvo\\backend'' -Recurse -Force; Remove-Item -Path ''C:\\Fulvo\\frontend'' -Recurse -Force\")",
-      "Bash(powershell -Command \"Get-Process | Where-Object {$_Path -like ''*Fulvo*''} | Select-Object Id, ProcessName, Path\")"
+      "Bash(powershell -Command \"Get-Process | Where-Object {$_Path -like ''*Fulvo*''} | Select-Object Id, ProcessName, Path\")",
+      "Bash(xxd:*)",
+      "Bash(powershell:*)",
+      "Bash(if exist dist rmdir /s /q dist)",
+      "Bash(npm run build:*)",
+      "Bash(npx cap sync:*)"
     ]
   }
 }

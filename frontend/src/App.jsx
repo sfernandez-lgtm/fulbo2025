@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import VerifyEmail from './pages/VerifyEmail'
 import PlayerHome from './pages/PlayerHome'
 import MatchDetail from './pages/MatchDetail'
 import PlayerProfile from './pages/PlayerProfile'
@@ -16,6 +17,7 @@ function App() {
         <Route path="/" element={<Login />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/player" element={<PlayerHome />} />
         <Route path="/player/match/:id" element={<MatchDetail />} />
         <Route path="/player/profile" element={<PlayerProfile />} />

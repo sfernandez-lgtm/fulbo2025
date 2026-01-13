@@ -7,6 +7,7 @@ function Register() {
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [telefono, setTelefono] = useState('');
   const [tipo, setTipo] = useState('');
   const [posicion, setPosicion] = useState('');
   const [error, setError] = useState('');
@@ -30,8 +31,15 @@ function Register() {
         userData.posicion = posicion;
       }
 
+      // Incluir teléfono si se proporcionó
+      if (telefono) {
+        userData.telefono = telefono;
+      }
+
       await register(userData);
-      navigate('/');
+
+      // Redirigir a verificación de email
+      navigate('/verify-email', { state: { email } });
     } catch (err) {
       setError(err.response?.data?.error || 'Error al registrarse');
     } finally {
@@ -82,13 +90,26 @@ function Register() {
           </div>
 
           <div>
+            <label className="block text-gray-300 mb-2">
+              Teléfono <span className="text-gray-500 text-sm">(opcional)</span>
+            </label>
+            <input
+              type="tel"
+              value={telefono}
+              onChange={(e) => setTelefono(e.target.value)}
+              className="w-full bg-gray-700 text-white rounded px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-400"
+              placeholder="+54 11 1234-5678"
+            />
+          </div>
+
+          <div>
             <label className="block text-gray-300 mb-2">Contraseña</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full bg-gray-700 text-white rounded px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-400"
-              placeholder="••••••••"
+              placeholder="********"
               required
             />
           </div>
@@ -116,20 +137,20 @@ function Register() {
                     : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                 }`}
               >
-                Dueño de Cancha
+                Dueno de Cancha
               </button>
             </div>
           </div>
 
           {tipo === 'jugador' && (
             <div>
-              <label className="block text-gray-300 mb-2">Posición preferida</label>
+              <label className="block text-gray-300 mb-2">Posicion preferida</label>
               <select
                 value={posicion}
                 onChange={(e) => setPosicion(e.target.value)}
                 className="w-full bg-gray-700 text-white rounded px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-400"
               >
-                <option value="">Seleccionar posición</option>
+                <option value="">Seleccionar posicion</option>
                 <option value="arquero">Arquero</option>
                 <option value="defensor">Defensor</option>
                 <option value="mediocampista">Mediocampista</option>
@@ -149,9 +170,9 @@ function Register() {
 
         {/* Login link */}
         <p className="text-center text-gray-400 mt-6">
-          ¿Ya tenés cuenta?{' '}
+          Ya tenes cuenta?{' '}
           <Link to="/" className="text-sky-400 hover:underline">
-            Iniciá sesión
+            Inicia sesion
           </Link>
         </p>
       </div>

@@ -1,0 +1,14 @@
+{
+  "appId": "com.fulvo.app",
+  "appName": "Fulvo",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "allowNavigation": ["fulbo-app-hl8hl.ondigitalocean.app"]
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  }
+}

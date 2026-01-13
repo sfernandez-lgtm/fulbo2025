@@ -35,3 +35,22 @@ export const getCurrentUser = () => {
 export const isAuthenticated = () => {
   return !!localStorage.getItem('token');
 };
+
+// Verificar código de email
+export const verificarCodigo = async (email: string, codigo: string) => {
+  const response = await api.post('/auth/verificar-codigo', { email, codigo });
+
+  // Si la verificación es exitosa, guardar token y usuario
+  if (response.data.token) {
+    localStorage.setItem('token', response.data.token);
+    localStorage.setItem('user', JSON.stringify(response.data.user));
+  }
+
+  return response.data;
+};
+
+// Reenviar código de verificación
+export const reenviarCodigo = async (email: string) => {
+  const response = await api.post('/auth/reenviar-codigo', { email });
+  return response.data;
+};
