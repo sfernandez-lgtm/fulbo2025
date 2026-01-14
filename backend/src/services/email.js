@@ -1,6 +1,15 @@
-const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Configuración de Brevo SMTP
+const transporter = nodemailer.createTransport({
+  host: 'smtp-relay.brevo.com',
+  port: 587,
+  secure: false,
+  auth: {
+    user: process.env.BREVO_SMTP_USER,
+    pass: process.env.BREVO_SMTP_PASS
+  }
+});
 
 // Genera un código de 6 dígitos
 function generarCodigo() {
@@ -10,8 +19,8 @@ function generarCodigo() {
 // Envía el código de verificación por email
 async function enviarCodigoVerificacion(email, nombre, codigo) {
   try {
-    const { data, error } = await resend.emails.send({
-      from: 'Fulvo <onboarding@resend.dev>',
+    const info = await transporter.sendMail({
+      from: 'Fulvo <fulvo.app@gmail.com>',
       to: email,
       subject: 'Verificá tu cuenta de Fulvo',
       html: `
@@ -52,13 +61,8 @@ async function enviarCodigoVerificacion(email, nombre, codigo) {
       `
     });
 
-    if (error) {
-      console.error('Error enviando email:', error);
-      return { success: false, error };
-    }
-
-    console.log('Email enviado:', data);
-    return { success: true, data };
+    console.log('Email enviado:', info.messageId);
+    return { success: true, data: info };
   } catch (error) {
     console.error('Error enviando email:', error);
     return { success: false, error };
