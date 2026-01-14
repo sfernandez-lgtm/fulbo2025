@@ -11,7 +11,7 @@ function generarCodigo() {
 async function enviarCodigoVerificacion(email, nombre, codigo) {
   try {
     const { data, error } = await resend.emails.send({
-      from: 'Fulvo <noreply@fulbo.app>',
+      from: 'Fulvo <onboarding@resend.dev>',
       to: email,
       subject: 'Verificá tu cuenta de Fulvo',
       html: `
