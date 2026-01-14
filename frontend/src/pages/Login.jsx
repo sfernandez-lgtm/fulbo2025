@@ -24,9 +24,9 @@ function Login() {
         navigate('/player');
       }
     } catch (err) {
-      // Si la cuenta no está verificada, redirigir a verificación
-      if (err.response?.data?.requiresVerification) {
-        navigate('/verify-email', { state: { email: err.response.data.email } });
+      // Si la cuenta no está verificada (403), redirigir a verificación
+      if (err.response?.status === 403 || err.response?.data?.requiresVerification) {
+        navigate(`/verify-email?email=${encodeURIComponent(email)}`);
         return;
       }
       setError(err.response?.data?.error || 'Error al iniciar sesión');
