@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="64" fill="#87CEEB"/>
+  <circle cx="256" cy="256" r="160" fill="white" stroke="#333" stroke-width="8"/>
+  <path d="M256 96 L256 150 M256 362 L256 416 M96 256 L150 256 M362 256 L416 256" stroke="#333" stroke-width="5"/>
+  <polygon points="256,150 300,192 288,245 224,245 212,192" fill="#333"/>
+  <polygon points="362,256 320,214 320,298" fill="#333"/>
+  <polygon points="150,256 192,214 192,298" fill="#333"/>
+  <polygon points="212,320 256,362 300,320" fill="#333"/>
+  <text x="256" y="480" text-anchor="middle" font-family="Arial, sans-serif" font-size="36" font-weight="bold" fill="#333">FULVO</text>
+</svg>

@@ -9,12 +9,13 @@ import OwnerDashboard from './pages/OwnerDashboard'
 import Rankings from './pages/Rankings'
 import Friends from './pages/Friends'
 import Leagues from './pages/Leagues'
+import PublicHome from './pages/PublicHome'
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Login />} />
+        <Route path="/" element={<PublicHome />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/verify-email" element={<VerifyEmail />} />

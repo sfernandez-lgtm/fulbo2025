@@ -21,7 +21,9 @@
       "Bash(powershell:*)",
       "Bash(if exist dist rmdir /s /q dist)",
       "Bash(npm run build:*)",
-      "Bash(npx cap sync:*)"
+      "Bash(npx cap sync:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)"
     ]
   }
 }
