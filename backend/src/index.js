@@ -14,6 +14,7 @@ const friendsRoutes = require('./routes/friends');
 const leaguesRoutes = require('./routes/leagues');
 const ownersRoutes = require('./routes/owners');
 const chatRoutes = require('./routes/chat');
+const waitlistRoutes = require('./routes/waitlist');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -42,6 +43,7 @@ app.use('/api/friends', friendsRoutes);
 app.use('/api/leagues', leaguesRoutes);
 app.use('/api/owners', ownersRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/waitlist', waitlistRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

@@ -10,12 +10,17 @@ import Rankings from './pages/Rankings'
 import Friends from './pages/Friends'
 import Leagues from './pages/Leagues'
 import PublicHome from './pages/PublicHome'
+import PreLaunchLanding from './pages/PreLaunchLanding'
+
+// TEMPORAL: Cambiar a false después del 1 de febrero 2026 para volver a la home normal
+const PRE_LAUNCH_MODE = true
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<PublicHome />} />
+        <Route path="/" element={PRE_LAUNCH_MODE ? <PreLaunchLanding /> : <PublicHome />} />
+        <Route path="/home" element={<PublicHome />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
